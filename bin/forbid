@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -euxo pipefail
+
+which rg
+
+! rg \
+  --glob !bin/forbid \
+  --glob !CHANGELOG.md \
+  --ignore-case \
+  'dbg!|fixme|todo|xxx' \
+  .

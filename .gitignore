@@ -1,0 +1,17 @@
+.DS_Store
+.idea
+/.vagrant
+/.vscode
+/README.html
+/book/en/build
+/book/en/src
+/book/zh/build
+/book/zh/src
+/fuzz/artifacts
+/fuzz/corpus
+/fuzz/target
+/man
+/target
+/test-utilities/Cargo.lock
+/test-utilities/target
+/tmp
