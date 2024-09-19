@@ -1,4 +1,4 @@
-name: Sync repo
+name: Pull repo
 
 on:
   workflow_dispatch:
@@ -8,13 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Create branch
-        uses: peterjgrainger/action-create-branch@v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          branch: 'sync-action'
 
       - uses: actions/checkout@v4
         with:
@@ -32,19 +25,20 @@ jobs:
   
       - name: Create PR
         id: cpr
-        uses: gr2m/create-or-update-pull-request-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: peter-evans/create-pull-request@v7
         with:
-          title: "chore: sync files from source repo"
-          path: .
-          branch: "sync-action"
+          token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: sync files from source repo"
-          author: "gnpaone <78990165+gnpaone@users.noreply.github.com>"
+          committer: gnpaone <78990165+gnpaone@users.noreply.github.com>
+          author: gnpaone <78990165+gnpaone@users.noreply.github.com>
+          branch: sync-action
+          base: master
+          delete-branch: true
+          title: Sync source repo
           labels: ":zap: pull"
 
       # - name: Identify merge conflict
-      #   if: steps.cpr.outputs.result == 'created' || steps.cpr.outputs.result == 'updated'
+      #   if: steps.cpr.outputs.pull-request-operation == 'created'
       #   id: conf
       #   uses: codytseng/auto-comment-merge-conflicts@v1
       #   with:
@@ -59,21 +53,21 @@ jobs:
       #     assignees: gnpaone
 
       - name: Enable pull request automerge
-        if: steps.cpr.outputs.result == 'created' || steps.cpr.outputs.result == 'updated'
+        if: steps.cpr.outputs.pull-request-operation == 'created'
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
 
       - name: Auto approve
-        if: steps.cpr.outputs.result == 'created' || steps.cpr.outputs.result == 'updated'
+        if: steps.cpr.outputs.pull-request-operation == 'created'
         uses: juliangruber/approve-pull-request-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           number: ${{ steps.cpr.outputs.pull-request-number }}
 
       - name: Delete PRs head branch
-        if: steps.cpr.outputs.result == 'created' || steps.cpr.outputs.result == 'updated'
+        if: steps.cpr.outputs.pull-request-operation == 'created'
         uses: dawidd6/action-delete-branch@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
