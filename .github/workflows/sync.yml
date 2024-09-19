@@ -1,0 +1,81 @@
+name: Sync repo
+
+on:
+  workflow_dispatch:
+
+jobs:
+  commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create branch
+        uses: peterjgrainger/action-create-branch@v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          branch: 'sync-action'
+
+      - uses: actions/checkout@v4
+        with:
+          repository: casey/just
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: ./.sync-repo
+          ref: master
+  
+      - name: Replace files
+        shell: bash
+        run: |
+          rm -rf ./.sync-repo/.git  
+          rsync -av --exclude='.github/' ./.sync-repo/ .
+          rm -rf ./.sync-repo/
+  
+      - name: Create PR
+        id: cpr
+        uses: gr2m/create-or-update-pull-request-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          title: "chore: sync files from source repo"
+          path: .
+          branch: "sync-action"
+          commit-message: "chore: sync files from source repo"
+          author: "gnpaone <78990165+gnpaone@users.noreply.github.com>"
+          labels: ":zap: pull"
+
+      # - name: Identify merge conflict
+      #   if: steps.cpr.outputs.result == 'created' || steps.cpr.outputs.result == 'updated'
+      #   id: conf
+      #   uses: codytseng/auto-comment-merge-conflicts@v1
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     label-name: ":no_entry: merge-conflict"
+
+      # - name: Assign PR
+      #   if: steps.conf.outputs.new-conflicting-prs && (Object.keys(steps.conf.outputs.new-conflicting-prs).length > 0) && (String(steps.cpr.outputs.pull-request-number) == String(steps.conf.outputs.new-conflicting-prs.number))
+      #   uses: wow-actions/auto-assign@v3
+      #   with:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     assignees: gnpaone
+
+      - name: Enable pull request automerge
+        if: steps.cpr.outputs.result == 'created' || steps.cpr.outputs.result == 'updated'
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+
+      - name: Auto approve
+        if: steps.cpr.outputs.result == 'created' || steps.cpr.outputs.result == 'updated'
+        uses: juliangruber/approve-pull-request-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          number: ${{ steps.cpr.outputs.pull-request-number }}
+
+      - name: Delete PRs head branch
+        if: steps.cpr.outputs.result == 'created' || steps.cpr.outputs.result == 'updated'
+        uses: dawidd6/action-delete-branch@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          numbers: ${{ steps.cpr.outputs.pull-request-number }}
+          
