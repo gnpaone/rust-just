@@ -18,7 +18,7 @@ jobs:
         uses: marchbold/copy-release-to-repository-action@v2
         with:
           source_repo: 'casey/just'
-          destination_repo: 'gnpaone/rust-pkg'
+          destination_repo: 'gnpaone/rust-just'
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.latesttag.outputs.tag }}
           
