@@ -1,0 +1,24 @@
+name: Copy release artifacts
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find latest tag
+        uses: oprypin/find-latest-tag@v1
+        with:
+          repository: casey/just
+          releases-only: true 
+        id: latesttag
+
+      - name: Copy Release
+        uses: marchbold/copy-release-to-repository-action@v2
+        with:
+          source_repo: 'casey/just'
+          destination_repo: 'gnpaone/rust-pkg'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.latesttag.outputs.tag }}
+          
