@@ -1,0 +1,140 @@
+name: NPM Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish-binaries:
+    name: Publish binaries
+    needs: generate-changelog
+    runs-on: ${{ matrix.build.OS }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build:
+          - {
+              NAME: linux-x64-musl,
+              OS: ubuntu-22.04,
+              TOOLCHAIN: stable,
+              TARGET: x86_64-unknown-linux-musl,
+            }
+          - {
+              NAME: linux-arm64-musl,
+              OS: ubuntu-22.04,
+              TOOLCHAIN: stable,
+              TARGET: aarch64-unknown-linux-musl,
+            }
+          - {
+              NAME: linux-arm-musleabihf,
+              OS: ubuntu-22.04,
+              TOOLCHAIN: stable,
+              TARGET: arm-unknown-linux-musleabihf,
+            }
+          - {
+              NAME: win32-x64-msvc,
+              OS: windows-2022,
+              TOOLCHAIN: stable,
+              TARGET: x86_64-pc-windows-msvc,
+            }
+          - {
+              NAME: win32-arm64-msvc,
+              OS: windows-2022,
+              TOOLCHAIN: stable,
+              TARGET: aarch64-pc-windows-msvc,
+            }
+          - {
+              NAME: darwin-x64,
+              OS: macos-14,
+              TOOLCHAIN: stable,
+              TARGET: x86_64-apple-darwin,
+            }
+          - {
+              NAME: darwin-arm64,
+              OS: macos-14,
+              TOOLCHAIN: stable,
+              TARGET: aarch64-apple-darwin,
+            }
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Find latest tag
+        uses: oprypin/find-latest-tag@v1
+        with:
+          repository: gnpaone/rust-just
+          releases-only: true 
+        id: latesttag
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: just-${{ steps.latesttag.outputs.tag }}-${{ matrix.build.TARGET }}.*
+          path: ./release
+      - name: Extract and Copy Binary
+        run: |
+          mkdir -p ./target/${{ matrix.build.TARGET }}/release
+          if [[ ${{ matrix.build.OS }} == 'windows-2022' ]]; then
+            unzip ./release/just-${{ steps.latesttag.outputs.tag }}-${{ matrix.build.TARGET }}.zip -d ./target/${{ matrix.build.TARGET }}/release/
+          else
+            tar -xzf ./release/just-${{ steps.latesttag.outputs.tag }}-${{ matrix.build.TARGET }}.tar.gz -C ./target/${{ matrix.build.TARGET }}/release/
+          fi
+      - name: Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          registry-url: "https://registry.npmjs.org"
+      - name: Publish to NPM
+        shell: bash
+        run: |
+          cd npm
+          bin="just"
+          node_os=$(echo "${{ matrix.build.NAME }}" | cut -d '-' -f1)
+          export node_os
+          node_arch=$(echo "${{ matrix.build.NAME }}" | cut -d '-' -f2)
+          export node_arch
+          export version="${{ steps.latesttag.outputs.tag }}"
+          if [ "${{ matrix.build.OS }}" = "windows-2022" ]; then
+            export node_pkg="rust-${bin}-windows-${node_arch}"
+          else
+            export node_pkg="rust-${bin}-${node_os}-${node_arch}"
+          fi
+          mkdir -p "${node_pkg}/bin"
+          envsubst < package.json.tmpl > "${node_pkg}/package.json"
+          if [ "${{ matrix.build.OS }}" = "windows-2022" ]; then
+            bin="${bin}.exe"
+          fi
+          cp "../target/${{ matrix.build.TARGET }}/release/${bin}" "${node_pkg}/bin"
+          cp ../README.md "${node_pkg}"
+          cd "${node_pkg}"
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-npm:
+    name: Publish the base package to NPM
+    needs: publish-binaries
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          registry-url: "https://registry.npmjs.org"
+      - name: Publish the package
+        shell: bash
+        working-directory: npm/rust-just
+        run: |
+          yarn config set npmAuthToken ${NODE_AUTH_TOKEN}
+          yarn config set npmPublishRegistry "https://registry.npmjs.org"
+          yarn install
+          yarn build
+          cp ../../README.md .
+          cp ../../CHANGELOG.md .
+          if [ ${{ contains(github.ref, '-') }} = "true" ]; then
+            yarn npm publish --tag rc
+          else
+            yarn npm publish
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          YARN_ENABLE_IMMUTABLE_INSTALLS: false
