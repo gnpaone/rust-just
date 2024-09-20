@@ -1,0 +1,94 @@
+{
+  "name": "rust-just",
+  "version": "1.35.0",
+  "description": "🤖 Just a command runner",
+  "type": "module",
+  "main": "lib/cjs/index.d.cts",
+  "module": "lib/esm/index.d.ts",
+  "types": "lib/cjs/index.d.cts",
+  "bin": "lib/cli/cli.js",
+  "exports": {
+    "./cli": {
+      "import": "./lib/cli/cli.js"
+    },
+    ".": {
+      "import": {
+        "types": "./lib/esm/index.d.ts",
+        "default": "./lib/esm/index.js"
+      },
+      "require": {
+        "types": "./lib/cjs/index.d.cts",
+        "default": "./lib/cjs/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "lib"
+  ],
+  "scripts": {
+    "typecheck": "tsc",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "build": "tsup",
+    "dev": "yarn build && node lib/cli/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gnpaone/rust-just.git"
+  },
+  "keywords": [
+    "just",
+    "rust-just",
+    "cli",
+    "command line",
+    "utilities",
+    "rust"
+  ],
+  "author": "Naveen Prashanth <gnpaone@gmail.com>",
+  "license": "CC0-1.0",
+  "bugs": {
+    "url": "https://github.com/casey/just/issues"
+  },
+  "homepage": "https://github.com/casey/just#readme",
+  "dependencies": {
+    "execa": "^8.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.22",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "eslint": "^8.57.0",
+    "tsup": "^8.0.2",
+    "typescript": "^5.3.3"
+  },
+  "optionalDependencies": {
+    "rust-just-darwin-arm64": "1.35.0",
+    "rust-just-darwin-x64": "1.35.0",
+    "rust-just-linux-arm64": "1.35.0",
+    "rust-just-linux-arm": "1.35.0",
+    "rust-just-linux-x64": "1.35.0",
+    "rust-just-windows-arm64": "1.35.0",
+    "rust-just-windows-x64": "1.35.0"
+  },
+  "eslintConfig": {
+    "extends": [
+      "eslint:recommended",
+      "plugin:@typescript-eslint/recommended"
+    ],
+    "parser": "@typescript-eslint/parser",
+    "plugins": [
+      "@typescript-eslint"
+    ],
+    "ignorePatterns": [
+      "lib/*"
+    ],
+    "root": true
+  },
+  "packageManager": "yarn@4.5.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.19 || >=20.6 || >=21"
+  }
+}
