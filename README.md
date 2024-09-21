@@ -272,6 +272,12 @@ most Windows users.)
       <td><code>nix-env -iA nixpkgs.just</code></td>
     </tr>
     <tr>
+      <td><a href=https://github.com/pypa/pipx?tab=readme-ov-file#install-pipx>Various</a></td>
+      <td><a href=https://pypi.org/>PyPI</a></td>
+      <td><a href=https://pypi.org/project/rust-just/>rust-just</a></td>
+      <td><code>pipx install rust-just</code></td>
+    </tr>
+    <tr>
       <td><a href=https://voidlinux.org>Void Linux</a></td>
       <td><a href=https://wiki.voidlinux.org/XBPS>XBPS</a></td>
       <td><a href=https://github.com/void-linux/void-packages/blob/master/srcpkgs/just/template>just</a></td>
@@ -745,6 +751,48 @@ you can suppress the heading line entirely by passing the empty string:
 $ just --list --list-heading ''
     test
     build
+```
+
+### Invoking Multiple Recipes
+
+Multiple recipes may be invoked on the command line at once:
+
+```just
+build:
+  make web
+
+serve:
+  python3 -m http.server -d out 8000
+```
+
+```sh
+$ just build serve
+make web
+python3 -m http.server -d out 8000
+```
+
+Keep in mind that recipes with parameters will swallow arguments, even if they
+match the names of other recipes:
+
+```just
+build project:
+  make {{project}}
+
+serve:
+  python3 -m http.server -d out 8000
+```
+
+```sh
+$ just build serve
+make: *** No rule to make target `serve'.  Stop.
+```
+
+The `--one` flag can be used to restrict command-line invocations to a single
+recipe:
+
+```sh
+$ just --one build serve
+error: Expected 1 command-line recipe invocation but found 2.
 ```
 
 ### Working Directory
