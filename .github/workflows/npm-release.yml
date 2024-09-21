@@ -49,10 +49,11 @@ jobs:
           releases-only: true 
         id: latesttag
       - name: Download release artifact
-        uses: actions/download-artifact@v4
+        uses: robinraju/release-downloader@v1.11
         with:
-          name: just-${{ steps.latesttag.outputs.tag }}-${{ matrix.TARGET }}.*
-          path: ./release
+          tag: ${{ steps.latesttag.outputs.tag }}
+          fileName: just-${{ steps.latesttag.outputs.tag }}-${{ matrix.TARGET }}.*
+          out-file-path: './release'
       - name: Extract and Copy Binary
         run: |
           mkdir -p ./target/${{ matrix.TARGET }}/release
