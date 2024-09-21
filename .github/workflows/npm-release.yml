@@ -55,6 +55,7 @@ jobs:
           fileName: just-${{ steps.latesttag.outputs.tag }}-${{ matrix.TARGET }}.*
           out-file-path: './release'
       - name: Extract and Copy Binary
+        shell: bash
         run: |
           mkdir -p ./target/${{ matrix.TARGET }}/release
           if [[ ${{ matrix.OS }} == 'windows-2022' ]]; then
