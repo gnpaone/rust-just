@@ -102,18 +102,58 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Find latest tag
+        uses: oprypin/find-latest-tag@v1
+        with:
+          repository: gnpaone/rust-just
+          releases-only: true 
+        id: latesttag
       - name: Install node
         uses: actions/setup-node@v4
         with:
           node-version: 18
           registry-url: "https://registry.npmjs.org"
+      - name: Update version & lockfile
+        shell: bash
+        working-directory: npm/rust-just
+        run: |
+          LATEST_VERSION=$(git tag | sort -V | tail -1)
+          sed -i "s/\"version\": \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"$LATEST_VERSION\"/; s/\"\(rust-just-[^\"]*\)\": \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"\1\": \"$LATEST_VERSION\"/g" package.json
+          yarn install
+      - name: Create PR
+        id: cpr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "update version & modify lockfile"
+          committer: gnpaone <78990165+gnpaone@users.noreply.github.com>
+          author: gnpaone <78990165+gnpaone@users.noreply.github.com>
+          branch: npm-update
+          base: master
+          add-paths: |
+            npm/rust-just/package.json
+            npm/rust-just/yarn.lock
+          delete-branch: true
+          title: Bump npm package version
+          labels: ":mag_right: bump"
+      - name: Enable pull request automerge
+        if: steps.cpr.outputs.pull-request-operation == 'created'
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+      - name: Delete PRs head branch
+        if: steps.cpr.outputs.pull-request-operation == 'created'
+        uses: dawidd6/action-delete-branch@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          numbers: ${{ steps.cpr.outputs.pull-request-number }}
       - name: Publish the package
         shell: bash
         working-directory: npm/rust-just
         run: |
           yarn config set npmAuthToken ${NODE_AUTH_TOKEN}
           yarn config set npmPublishRegistry "https://registry.npmjs.org"
-          yarn install
           yarn build
           cp ../../README.md .
           cp ../../CHANGELOG.md .
@@ -124,4 +164,3 @@ jobs:
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          YARN_ENABLE_IMMUTABLE_INSTALLS: false

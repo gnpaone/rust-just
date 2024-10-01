@@ -2,24 +2,10 @@
   "name": "rust-just",
   "version": "1.35.0",
   "description": "🤖 Just a command runner",
-  "type": "module",
-  "main": "lib/cjs/index.d.cts",
-  "module": "lib/esm/index.d.ts",
-  "types": "lib/cjs/index.d.cts",
-  "bin": "lib/cli/cli.js",
+  "bin": "lib/index.mjs",
   "exports": {
-    "./cli": {
-      "import": "./lib/cli/cli.js"
-    },
     ".": {
-      "import": {
-        "types": "./lib/esm/index.d.ts",
-        "default": "./lib/esm/index.js"
-      },
-      "require": {
-        "types": "./lib/cjs/index.d.cts",
-        "default": "./lib/cjs/index.cjs"
-      }
+      "import": "./lib/index.mjs"
     }
   },
   "files": [
@@ -30,7 +16,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "build": "tsup",
-    "dev": "yarn build && node lib/cli/cli.js"
+    "dev": "yarn build && node lib/index.js"
   },
   "repository": {
     "type": "git",
@@ -51,7 +37,7 @@
   },
   "homepage": "https://github.com/casey/just#readme",
   "dependencies": {
-    "execa": "^8.0.1"
+    "execa": "^9.4.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.22",
