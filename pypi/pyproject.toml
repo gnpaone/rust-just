@@ -24,7 +24,7 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/casey/just"
+Repository = "https://github.com/gnpaone/rust-just"
 Documentation = "https://github.com/casey/just"
 Changelog = "https://github.com/casey/just/blob/master/CHANGELOG.md"
 
