@@ -117,7 +117,7 @@ jobs:
         shell: bash
         working-directory: npm/rust-just
         run: |
-          LATEST_VERSION=${{ steps.latesttag.outputs.tag }}
+          LATEST_VERSION=$(git tag | sort -V | tail -1)
           echo $LATEST_VERSION
           sed -i "s/\"version\": \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"$LATEST_VERSION\"/; s/\"\(rust-just-[^\"]*\)\": \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"\1\": \"$LATEST_VERSION\"/g" package.json
           yarn install
@@ -156,19 +156,19 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           numbers: ${{ steps.cpr.outputs.pull-request-number }}
-      - name: Publish the package
-        shell: bash
-        working-directory: npm/rust-just
-        run: |
-          yarn config set npmAuthToken ${NODE_AUTH_TOKEN}
-          yarn config set npmPublishRegistry "https://registry.npmjs.org"
-          yarn build
-          cp ../../README.md .
-          cp ../../CHANGELOG.md .
-          if [ ${{ contains(github.ref, '-') }} = "true" ]; then
-            yarn npm publish --tag rc
-          else
-            yarn npm publish
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # - name: Publish the package
+      #   shell: bash
+      #   working-directory: npm/rust-just
+      #   run: |
+      #     yarn config set npmAuthToken ${NODE_AUTH_TOKEN}
+      #     yarn config set npmPublishRegistry "https://registry.npmjs.org"
+      #     yarn build
+      #     cp ../../README.md .
+      #     cp ../../CHANGELOG.md .
+      #     if [ ${{ contains(github.ref, '-') }} = "true" ]; then
+      #       yarn npm publish --tag rc
+      #     else
+      #       yarn npm publish
+      #     fi
+      #   env:
+      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
