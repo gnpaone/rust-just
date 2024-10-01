@@ -117,7 +117,7 @@ jobs:
         shell: bash
         working-directory: npm/rust-just
         run: |
-          LATEST_VERSION=$(git tag | sort -V | tail -1)
+          LATEST_VERSION=${{ steps.latesttag.outputs.tag }}
           echo $LATEST_VERSION
           sed -i "s/\"version\": \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"version\": \"$LATEST_VERSION\"/; s/\"\(rust-just-[^\"]*\)\": \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/\"\1\": \"$LATEST_VERSION\"/g" package.json
           yarn install
