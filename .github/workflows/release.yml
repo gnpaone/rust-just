@@ -2,6 +2,8 @@ name: Copy release artifacts
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [new-release]
 
 jobs:
   release:
