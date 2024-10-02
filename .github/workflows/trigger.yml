@@ -21,8 +21,7 @@ jobs:
           releases-only: true 
         id: targettag
 
-      - if: steps.targettag.outputs.tag > 1.35.0
-        run: |
+      - run: |
           declare -i num="${{ steps.targettag.outputs.tag }}"
           echo ${{ steps.targettag.outputs.tag }}
           declare -p num
