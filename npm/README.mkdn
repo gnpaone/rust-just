@@ -2,17 +2,17 @@
 
 <div align=center>
   <a href=https://github.com/gnpaone/rust-just>
-    <img src=https://img.shields.io/badge/gnpaone%2Frust-just?style=for-the-badge&logo=github&labelColor=black&color=orchid
+    <img src=https://img.shields.io/badge/gnpaone%2Frust-just?style=for-the-badge&logo=github&label=github&labelColor=black&color=silver
  alt="github repo">
   </a>
   <a href=https://www.npmjs.com/package/rust-just>
-    <img src=https://img.shields.io/npm/dm/rust-just?style=for-the-badge&color=silver alt="npm downloads">
+    <img src=https://img.shields.io/npm/dm/rust-just?style=for-the-badge&color=orchid alt="npm downloads">
   </a>
   <a href=https://github.com/gnpaone/rust-just/blob/master/LICENSE>
     <img src=https://img.shields.io/npm/l/rust-just?style=for-the-badge alt="license">
   </a>
   <a href=https://www.npmjs.com/package/rust-just>
-    <img src=https://img.shields.io/npm/v/rust-just?style=for-the-badge&labelColor=firebrick&color=tan
+    <img src=https://img.shields.io/npm/v/rust-just?style=for-the-badge&labelColor=firebrick&color=tan&logo=npm
  alt="npm version">
   </a>
 </div>
