@@ -2,7 +2,7 @@
 
 <div align=center>
   <a href=https://github.com/gnpaone/rust-just>
-    <img src=https://img.shields.io/badge/gnpaone%2Frust-just?style=for-the-badge&logo=github&label=github&labelColor=black&color=silver
+    <img src=https://img.shields.io/badge/github-rust--just-silver?style=for-the-badge&logo=github&labelColor=black
  alt="github repo">
   </a>
   <a href=https://www.npmjs.com/package/rust-just>
