@@ -2,6 +2,10 @@ name: NPM Release
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Copy release artifacts"]
+    types:
+      - completed
 
 jobs:
   publish-binaries:
