@@ -1,0 +1,27 @@
+name: Trigger release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  commits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find latest tag of source repo
+        uses: oprypin/find-latest-tag@v1
+        with:
+          repository: casey/just
+          releases-only: true 
+        id: sourcetag
+
+      - name: Find latest tag of target repo
+        uses: oprypin/find-latest-tag@v1
+        with:
+          repository: gnpaone/rust-just
+          releases-only: true 
+        id: targettag
+
+      - run: |
+          echo ${{ steps.targettag.outputs.tag }}
+          echo typeof ${{ steps.targettag.outputs.tag }}
+          
