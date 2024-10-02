@@ -113,6 +113,11 @@ jobs:
         with:
           node-version: 18
           registry-url: "https://registry.npmjs.org"
+      - name: Wait for npm repository to index the binaries
+        uses: AliSajid/random-wait-action@v2.5.0
+        with:
+          minimum: 30
+          maximum: 60
       - name: Update version & lockfile
         shell: bash
         working-directory: npm/rust-just
