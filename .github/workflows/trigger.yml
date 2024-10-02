@@ -22,6 +22,8 @@ jobs:
         id: targettag
 
       - run: |
+          declare -p ${{ steps.targettag.outputs.tag }}
+          declare -i num="${{ steps.targettag.outputs.tag }}"
           echo ${{ steps.targettag.outputs.tag }}
-          echo typeof ${{ steps.targettag.outputs.tag }}
+          declare -p num
           
