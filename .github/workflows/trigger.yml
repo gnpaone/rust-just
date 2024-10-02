@@ -2,6 +2,10 @@ name: Trigger release
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Sync repo"]
+    types:
+      - completed
 
 jobs:
   commits:
@@ -21,9 +25,27 @@ jobs:
           releases-only: true 
         id: targettag
 
-      - run: |
-          declare -i num="${{ steps.targettag.outputs.tag }}"
-          echo ${{ steps.targettag.outputs.tag }}
-          declare -p num
-          echo num
+      - run: npm install semver
+
+      - name: Check for new release
+        uses: actions/github-script@v7
+        id: rel-chk
+        with:
+          script: |
+            const semver = require('semver');
+
+            const ver1 = `${{ steps.sourcetag.outputs.tag }}`;
+            const ver2 = `${{ steps.targettag.outputs.tag }}`;
+
+            if (semver.gt(ver1, ver2)) {
+              core.setOutput('create_release', true);
+            } else {
+              core.setOutput('create_release', false);
+            }
+
+      - name: Trigger release event
+        if: steps.rel-chk.outputs.create_release == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: new-release
           
