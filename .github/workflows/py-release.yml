@@ -7,6 +7,10 @@ name: PIP Release
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Copy release artifacts"]
+    types:
+      - completed
 
 permissions:
   contents: read
