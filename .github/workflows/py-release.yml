@@ -44,6 +44,7 @@ jobs:
         with:
           name: "wheels-linux-${{ matrix.target }}"
           path: pypi/dist
+          retention-days: 7
 
   musllinux:
     runs-on: ${{ matrix.runner }}
@@ -73,6 +74,7 @@ jobs:
         with:
           name: "wheels-musllinux-${{ matrix.target }}"
           path: pypi/dist
+          retention-days: 7
 
   windows:
     runs-on: ${{ matrix.runner }}
@@ -101,6 +103,7 @@ jobs:
         with:
           name: "wheels-windows-${{ matrix.target }}"
           path: pypi/dist
+          retention-days: 7
 
   macos:
     runs-on: ${{ matrix.runner }}
@@ -129,6 +132,7 @@ jobs:
         with:
           name: "wheels-macos-${{ matrix.target }}"
           path: pypi/dist
+          retention-days: 7
 
   sdist:
     runs-on: ubuntu-latest
@@ -152,6 +156,7 @@ jobs:
         with:
           name: "wheels-sdist"
           path: pypi/dist
+          retention-days: 7
 
   release:
     name: Release
