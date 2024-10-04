@@ -8,7 +8,7 @@ on:
       - completed
 
 jobs:
-  commits:
+  check:
     runs-on: ubuntu-latest
     steps:
       - name: Find latest tag of source repo
