@@ -99,7 +99,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  publish-npm:
+  publish-base:
     name: Publish the base package to NPM
     needs: publish-binaries
     runs-on: ubuntu-22.04
