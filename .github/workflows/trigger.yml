@@ -15,6 +15,7 @@ jobs:
         uses: oprypin/find-latest-tag@v1
         with:
           repository: casey/just
+          regex: '^\d+\.\d+\.\d+$'
           releases-only: true 
         id: sourcetag
 
