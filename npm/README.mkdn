@@ -27,6 +27,8 @@ inspired by `make`
 
 ## Getting Started
 
+### Run instantly without installation
+
 The recommended way to run `rust-just` is by using <a href="https://www.npmjs.com/package/npx">`npx`</a>:
 
 ```
