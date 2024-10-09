@@ -1,3 +1,5 @@
+<div align=right>Table of Contents↗️</div>
+
 <h1 align=center><code>rust-just</code></h1>
 
 <div align=center>
