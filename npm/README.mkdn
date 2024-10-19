@@ -57,6 +57,14 @@ and then run with:
 ~/$ npm install rust-just
 ```
 
+> **Note:** To pass Execa options to `rust-just`, use the `--execaoptions <OPTIONS>` flag, where `OPTIONS` is in JSON format. For example:
+> 
+> ```
+> ~/$ rust-just --execaoptions '{"stdio": "inherit", "reject": false}' [OPTIONS] [ARGUMENTS]...
+> ```
+> 
+> For a complete list of available Execa options, refer to the [Execa API documentation](https://github.com/sindresorhus/execa/blob/main/docs/api.md#options-1).
+
 To read more visit: https://just.systems/man/en/
 
 ## Author & Maintainer
