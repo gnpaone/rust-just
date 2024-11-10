@@ -93,7 +93,7 @@ jobs:
             bin="${bin}.exe"
           fi
           cp "../target/${{ matrix.TARGET }}/release/${bin}" "${node_pkg}/bin"
-          cp ../README.md "${node_pkg}"
+          cp ./README.md "${node_pkg}"
           cd "${node_pkg}"
           npm publish
         env:
@@ -166,7 +166,7 @@ jobs:
           yarn config set npmAuthToken ${NODE_AUTH_TOKEN}
           yarn config set npmPublishRegistry "https://registry.npmjs.org"
           yarn build
-          cp ../../README.md .
+          cp ../README.md .
           cp ../../CHANGELOG.md .
           if [ ${{ contains(github.ref, '-') }} = "true" ]; then
             yarn npm publish --tag rc
