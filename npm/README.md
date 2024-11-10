@@ -79,6 +79,6 @@ The documentation is available as a [book](https://just.systems/man/en/).
 
 ---
 
-### Disclaimer
+## Disclaimer
 
 The [`rust-just` npm package](https://www.npmjs.com/package/rust-just) is maintained by [@gnpaone](https://www.github.com/gnpaone) with permission from the original `just` developer. This package is not officially maintained by [`just`’s creator](https://github.com/casey) but uses up-to-date, official binaries from the [casey/just](https://github.com/casey/just) repository at the time of release to ensure compatibility and authenticity.
