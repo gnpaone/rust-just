@@ -167,7 +167,7 @@ most Windows users.)
     <tr>
       <td><a href=https://www.npmjs.com/>npm</a></td>
       <td><a href=https://www.npmjs.com/package/rust-just>rust-just</a></td>
-      <td><code>npm install rust-just</code></td>
+      <td><code>npm install -g rust-just</code></td>
     </tr>
     <tr>
       <td><a href=https://pypi.org/>PyPI</a></td>
@@ -2755,8 +2755,9 @@ scripts interpreted by `COMMAND`. This avoids some of the issues with shebang
 recipes, such as the use of `cygpath` on Windows, the need to use
 `/usr/bin/env`, and inconsistences in shebang line splitting across Unix OSs.
 
-Recipes with an empty `[script]` attribute are executed with the value of
-`set script-interpreter := […]`<sup>1.33.0</sup>, defaulting to `sh -eu`.
+Recipes with an empty `[script]` attribute are executed with the value of `set
+script-interpreter := […]`<sup>1.33.0</sup>, defaulting to `sh -eu`, and *not*
+the value of `set shell`.
 
 The body of the recipe is evaluated, written to disk in the temporary
 directory, and run by passing its path as an argument to `COMMAND`.
