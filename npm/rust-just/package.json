@@ -1,6 +1,6 @@
 {
   "name": "rust-just",
-  "version": "1.36.0",
+  "version": "1.37.0",
   "description": "🤖 Just a command runner",
   "bin": "lib/index.mjs",
   "exports": {
@@ -49,13 +49,13 @@
     "typescript": "^5.3.3"
   },
   "optionalDependencies": {
-    "rust-just-darwin-arm64": "1.36.0",
-    "rust-just-darwin-x64": "1.36.0",
-    "rust-just-linux-arm": "1.36.0",
-    "rust-just-linux-arm64": "1.36.0",
-    "rust-just-linux-x64": "1.36.0",
-    "rust-just-windows-arm64": "1.36.0",
-    "rust-just-windows-x64": "1.36.0"
+    "rust-just-darwin-arm64": "1.37.0",
+    "rust-just-darwin-x64": "1.37.0",
+    "rust-just-linux-arm": "1.37.0",
+    "rust-just-linux-arm64": "1.37.0",
+    "rust-just-linux-x64": "1.37.0",
+    "rust-just-windows-arm64": "1.37.0",
+    "rust-just-windows-x64": "1.37.0"
   },
   "eslintConfig": {
     "extends": [
