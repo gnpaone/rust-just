@@ -3,7 +3,8 @@ name: NPM Release
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["Copy release artifacts"]
+    workflows: 
+      - "new-release"
     types:
       - completed
 
