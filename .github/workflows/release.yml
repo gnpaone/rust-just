@@ -24,4 +24,9 @@ jobs:
           destination_repo: 'gnpaone/rust-just'
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.latesttag.outputs.tag }}
+
+      - name: Platform release event
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: platform-release
           
