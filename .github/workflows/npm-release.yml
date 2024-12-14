@@ -2,11 +2,8 @@ name: NPM Release
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: 
-      - "new-release"
-    types:
-      - completed
+  repository_dispatch:
+    types: [platform-release]
 
 jobs:
   publish-binaries:
