@@ -29,7 +29,7 @@ inspired by `make`
 
 ### Run instantly without installation
 
-The recommended way to run `rust-just` without installing it on your system is by using <a href="https://www.npmjs.com/package/npx">`npx`</a>:
+You can use `rust-just` without installing it on your system using <a href="https://www.npmjs.com/package/npx">`npx`</a>:
 
 ```
 ~/$ npx rust-just@latest [OPTIONS] [ARGUMENTS]...
@@ -39,7 +39,7 @@ It will run the most recent version of `rust-just`.
 
 ### Installation as global dependency
 
-`rust-just` could also be installed as a global dependency:
+The recommended way to install `rust-just` is as a global dependency:
 
 ```
 ~/$ npm install -g rust-just
@@ -52,6 +52,8 @@ and then run with:
 ```
 
 ### Installation as local dependency
+
+`rust-just` could also be installed as a local dependency:
 
 ```
 ~/$ npm install rust-just
