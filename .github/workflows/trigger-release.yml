@@ -6,12 +6,13 @@ on:
     workflows: ["Sync repo"]
     types:
       - completed
-  repository_dispatch:
-    types: [platform-release]
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    outputs:
+      source_tag: ${{ steps.sourcetag.outputs.tag }}
+      create_release: ${{ steps.rel-chk.outputs.create_release }}
     steps:
       - name: Find latest tag of source repo
         uses: oprypin/find-latest-tag@v1
@@ -46,9 +47,40 @@ jobs:
               core.setOutput('create_release', false);
             }
 
+  release:
+    runs-on: ubuntu-latest
+    if: needs.check.outputs.create_release == 'true'
+    needs: check
+    outputs:
+      copy_release: ${{ steps.copy_release.outcome }}
+    steps:
+      - name: Copy Release
+        id: copy_release
+        uses: marchbold/copy-release-to-repository-action@v2
+        with:
+          source_repo: 'casey/just'
+          destination_repo: 'gnpaone/rust-just'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ needs.check.outputs.source_tag }}
+
+  platform-release:
+    runs-on: ubuntu-latest
+    if: needs.release.outputs.copy_release == 'success'
+    needs: release
+    strategy:
+      matrix:
+        events: ['npm-release', 'pip-release']
+    steps:
+      - name: Find latest tag
+        uses: oprypin/find-latest-tag@v1
+        with:
+          repository: gnpaone/rust-just
+          releases-only: true 
+        id: latesttag
+
       - name: Trigger release event
-        if: steps.rel-chk.outputs.create_release == 'true'
         uses: peter-evans/repository-dispatch@v3
         with:
-          event-type: new-release
+          event-type: ${{ matrix.events }}
+          client-payload: '{"tag": "${{ steps.latesttag.outputs.tag }}"}'
           
