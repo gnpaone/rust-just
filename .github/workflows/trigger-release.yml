@@ -38,14 +38,10 @@ jobs:
           script: |
             const semver = require('semver');
 
-            const ver1 = `${{ steps.sourcetag.outputs.tag }}`;
-            const ver2 = `${{ steps.targettag.outputs.tag }}`;
+            const source_tag = `${{ steps.sourcetag.outputs.tag }}`;
+            const target_tag = `${{ steps.targettag.outputs.tag }}`;
 
-            if (semver.gt(ver1, ver2)) {
-              core.setOutput('create_release', true);
-            } else {
-              core.setOutput('create_release', false);
-            }
+            core.setOutput('create_release', semver.gt(source_tag, target_tag));
 
   release:
     runs-on: ubuntu-latest
@@ -82,5 +78,6 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           event-type: ${{ matrix.events }}
-          client-payload: '{"tag": "${{ steps.latesttag.outputs.tag }}"}'
+          client-payload: >
+            {"tag": "${{ steps.latesttag.outputs.tag }}"}
           
