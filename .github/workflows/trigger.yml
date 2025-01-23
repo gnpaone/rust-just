@@ -6,6 +6,8 @@ on:
     workflows: ["Sync repo"]
     types:
       - completed
+  repository_dispatch:
+    types: [platform-release]
 
 jobs:
   check:
