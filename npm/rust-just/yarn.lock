@@ -2477,51 +2477,51 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rust-just-darwin-arm64@npm:1.38.0":
-  version: 1.38.0
-  resolution: "rust-just-darwin-arm64@npm:1.38.0"
+"rust-just-darwin-arm64@npm:1.39.0":
+  version: 1.39.0
+  resolution: "rust-just-darwin-arm64@npm:1.39.0"
   conditions: os=darwin & cpu=arm64
   languageName: node
   linkType: hard
 
-"rust-just-darwin-x64@npm:1.38.0":
-  version: 1.38.0
-  resolution: "rust-just-darwin-x64@npm:1.38.0"
+"rust-just-darwin-x64@npm:1.39.0":
+  version: 1.39.0
+  resolution: "rust-just-darwin-x64@npm:1.39.0"
   conditions: os=darwin & cpu=x64
   languageName: node
   linkType: hard
 
-"rust-just-linux-arm64@npm:1.38.0":
-  version: 1.38.0
-  resolution: "rust-just-linux-arm64@npm:1.38.0"
+"rust-just-linux-arm64@npm:1.39.0":
+  version: 1.39.0
+  resolution: "rust-just-linux-arm64@npm:1.39.0"
   conditions: os=linux & cpu=arm64
   languageName: node
   linkType: hard
 
-"rust-just-linux-arm@npm:1.38.0":
-  version: 1.38.0
-  resolution: "rust-just-linux-arm@npm:1.38.0"
+"rust-just-linux-arm@npm:1.39.0":
+  version: 1.39.0
+  resolution: "rust-just-linux-arm@npm:1.39.0"
   conditions: os=linux & cpu=arm
   languageName: node
   linkType: hard
 
-"rust-just-linux-x64@npm:1.38.0":
-  version: 1.38.0
-  resolution: "rust-just-linux-x64@npm:1.38.0"
+"rust-just-linux-x64@npm:1.39.0":
+  version: 1.39.0
+  resolution: "rust-just-linux-x64@npm:1.39.0"
   conditions: os=linux & cpu=x64
   languageName: node
   linkType: hard
 
-"rust-just-windows-arm64@npm:1.38.0":
-  version: 1.38.0
-  resolution: "rust-just-windows-arm64@npm:1.38.0"
+"rust-just-windows-arm64@npm:1.39.0":
+  version: 1.39.0
+  resolution: "rust-just-windows-arm64@npm:1.39.0"
   conditions: os=win32 & cpu=arm64
   languageName: node
   linkType: hard
 
-"rust-just-windows-x64@npm:1.38.0":
-  version: 1.38.0
-  resolution: "rust-just-windows-x64@npm:1.38.0"
+"rust-just-windows-x64@npm:1.39.0":
+  version: 1.39.0
+  resolution: "rust-just-windows-x64@npm:1.39.0"
   conditions: os=win32 & cpu=x64
   languageName: node
   linkType: hard
@@ -2535,13 +2535,13 @@ __metadata:
     "@typescript-eslint/parser": "npm:^7.1.0"
     eslint: "npm:^8.57.0"
     execa: "npm:^9.4.1"
-    rust-just-darwin-arm64: "npm:1.38.0"
-    rust-just-darwin-x64: "npm:1.38.0"
-    rust-just-linux-arm: "npm:1.38.0"
-    rust-just-linux-arm64: "npm:1.38.0"
-    rust-just-linux-x64: "npm:1.38.0"
-    rust-just-windows-arm64: "npm:1.38.0"
-    rust-just-windows-x64: "npm:1.38.0"
+    rust-just-darwin-arm64: "npm:1.39.0"
+    rust-just-darwin-x64: "npm:1.39.0"
+    rust-just-linux-arm: "npm:1.39.0"
+    rust-just-linux-arm64: "npm:1.39.0"
+    rust-just-linux-x64: "npm:1.39.0"
+    rust-just-windows-arm64: "npm:1.39.0"
+    rust-just-windows-x64: "npm:1.39.0"
     tsup: "npm:^8.0.2"
     typescript: "npm:^5.3.3"
     yargs: "npm:^17.7.2"
