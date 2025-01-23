@@ -6,9 +6,8 @@
 name: PIP Release
 
 on:
-  workflow_dispatch:
   repository_dispatch:
-    types: [platform-release]
+    types: [pip-release]
 
 permissions:
   contents: read
