@@ -90,6 +90,7 @@ pub(crate) fn get(name: &str) -> Option<Function> {
     "read" => Unary(read),
     "replace" => Ternary(replace),
     "replace_regex" => Ternary(replace_regex),
+    "require" => Unary(require),
     "semver_matches" => Binary(semver_matches),
     "sha256" => Unary(sha256),
     "sha256_file" => Unary(sha256_file),
@@ -111,6 +112,7 @@ pub(crate) fn get(name: &str) -> Option<Function> {
     "uppercamelcase" => Unary(uppercamelcase),
     "uppercase" => Unary(uppercase),
     "uuid" => Nullary(uuid),
+    "which" => Unary(which),
     "without_extension" => Unary(without_extension),
     _ => return None,
   };
@@ -511,6 +513,10 @@ fn replace(_context: Context, s: &str, from: &str, to: &str) -> FunctionResult {
   Ok(s.replace(from, to))
 }
 
+fn require(context: Context, name: &str) -> FunctionResult {
+  crate::which(context, name)?.ok_or_else(|| format!("could not find executable `{name}`"))
+}
+
 fn replace_regex(_context: Context, s: &str, regex: &str, replacement: &str) -> FunctionResult {
   Ok(
     Regex::new(regex)
@@ -659,6 +665,10 @@ fn uppercase(_context: Context, s: &str) -> FunctionResult {
 
 fn uuid(_context: Context) -> FunctionResult {
   Ok(uuid::Uuid::new_v4().to_string())
+}
+
+fn which(context: Context, name: &str) -> FunctionResult {
+  Ok(crate::which(context, name)?.unwrap_or_default())
 }
 
 fn without_extension(_context: Context, path: &str) -> FunctionResult {

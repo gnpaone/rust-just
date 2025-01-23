@@ -1674,6 +1674,43 @@ set unstable
 foo := env('FOO') || 'DEFAULT_VALUE'
 ```
 
+#### Executables
+
+- `require(name)`<sup>1.39.0</sup> — Search directories in the `PATH`
+  environment variable for the executable `name` and return its full path, or
+  halt with an error if no executable with `name` exists.
+
+  ```just
+  bash := require("bash")
+
+  @test:
+      echo "bash: '{{bash}}'"
+  ```
+
+  ```console
+  $ just
+  bash: '/bin/bash'
+  ```
+
+- `which(name)`<sup>1.39.0</sup> — Search directories in the `PATH` environment
+  variable for the executable `name` and return its full path, or the empty
+  string if no executable with `name` exists. Currently unstable.
+
+
+  ```just
+  set unstable
+
+  bosh := which("bosh")
+
+  @test:
+      echo "bosh: '{{bosh}}'"
+  ```
+
+  ```console
+  $ just
+  bosh: ''
+  ```
+
 #### Invocation Information
 
 - `is_dependency()` - Returns the string `true` if the current recipe is being
@@ -1851,7 +1888,7 @@ which will halt execution.
 - `path_exists(path)` - Returns `true` if the path points at an existing entity
   and `false` otherwise. Traverses symbolic links, and returns `false` if the
   path is inaccessible or points to a broken symlink.
-- `read(path)`<sup>master</sup> - Returns the content of file at `path` as
+- `read(path)`<sup>1.39.0</sup> - Returns the content of file at `path` as
   string.
 
 ##### Error Reporting
@@ -2871,7 +2908,7 @@ hello:
 Recipes with a `[script(COMMAND)]`<sup>1.32.0</sup> attribute are run as
 scripts interpreted by `COMMAND`. This avoids some of the issues with shebang
 recipes, such as the use of `cygpath` on Windows, the need to use
-`/usr/bin/env`, and inconsistences in shebang line splitting across Unix OSs.
+`/usr/bin/env`, and inconsistencies in shebang line splitting across Unix OSs.
 
 Recipes with an empty `[script]` attribute are executed with the value of `set
 script-interpreter := […]`<sup>1.33.0</sup>, defaulting to `sh -eu`, and *not*
