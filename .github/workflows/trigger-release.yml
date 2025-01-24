@@ -67,17 +67,10 @@ jobs:
       matrix:
         events: ['npm-release', 'pip-release']
     steps:
-      - name: Find latest tag
-        uses: oprypin/find-latest-tag@v1
-        with:
-          repository: gnpaone/rust-just
-          releases-only: true 
-        id: latesttag
-
       - name: Trigger release event
         uses: peter-evans/repository-dispatch@v3
         with:
           event-type: ${{ matrix.events }}
-          client-payload: >
-            {"tag": "${{ steps.latesttag.outputs.tag }}"}
+          # client-payload: >
+          #   {"tag": "${{ steps.latesttag.outputs.tag }}"}
           
