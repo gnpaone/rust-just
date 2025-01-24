@@ -5,8 +5,22 @@ on:
     types: [npm-release]
 
 jobs:
+  find-latest-tag:
+    name: Find Latest Tag
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.get-tag.outputs.tag }}
+    steps:
+      - name: Find latest tag
+        id: get-tag
+        uses: oprypin/find-latest-tag@v1
+        with:
+          repository: gnpaone/rust-just
+          releases-only: true 
+
   publish-binaries:
     name: Publish binaries
+    needs: find-latest-tag
     runs-on: ${{ matrix.OS }}
     strategy:
       fail-fast: false
@@ -46,17 +60,17 @@ jobs:
       - name: Download release artifact
         uses: robinraju/release-downloader@v1.11
         with:
-          tag: ${{ github.event.client_payload.tag }}
-          fileName: just-${{ github.event.client_payload.tag }}-${{ matrix.TARGET }}.*
+          tag: ${{ needs.find-latest-tag.outputs.tag }}
+          fileName: just-${{ needs.find-latest-tag.outputs.tag }}-${{ matrix.TARGET }}.*
           out-file-path: './release'
       - name: Extract and Copy Binary
         shell: bash
         run: |
           mkdir -p ./target/${{ matrix.TARGET }}/release
           if [[ ${{ matrix.OS }} == 'windows-2022' ]]; then
-            unzip ./release/just-${{ github.event.client_payload.tag }}-${{ matrix.TARGET }}.zip -d ./target/${{ matrix.TARGET }}/release/
+            unzip ./release/just-${{ needs.find-latest-tag.outputs.tag }}-${{ matrix.TARGET }}.zip -d ./target/${{ matrix.TARGET }}/release/
           else
-            tar -xzf ./release/just-${{ github.event.client_payload.tag }}-${{ matrix.TARGET }}.tar.gz -C ./target/${{ matrix.TARGET }}/release/
+            tar -xzf ./release/just-${{ needs.find-latest-tag.outputs.tag }}-${{ matrix.TARGET }}.tar.gz -C ./target/${{ matrix.TARGET }}/release/
           fi
       - name: Install node
         uses: actions/setup-node@v4
@@ -72,7 +86,7 @@ jobs:
           export node_os
           node_arch=$(echo "${{ matrix.NAME }}" | cut -d '-' -f2)
           export node_arch
-          export version="${{ github.event.client_payload.tag }}"
+          export version="${{ needs.find-latest-tag.outputs.tag }}"
           if [ "${{ matrix.OS }}" = "windows-2022" ]; then
             export node_pkg="rust-${bin}-windows-${node_arch}"
           else
@@ -92,7 +106,7 @@ jobs:
 
   publish-base:
     name: Publish the base package to NPM
-    needs: publish-binaries
+    needs: [find-latest-tag, publish-binaries]
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -111,7 +125,7 @@ jobs:
         shell: bash
         working-directory: npm/rust-just
         run: |
-          LATEST_VERSION=${{ github.event.client_payload.tag }}
+          LATEST_VERSION=${{ needs.find-latest-tag.outputs.tag }}
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$LATEST_VERSION\"/; s/\"\(rust-just-[^\"]*\)\": \"[^\"]*\"/\"\1\": \"$LATEST_VERSION\"/g" package.json
           yarn install
         env:
