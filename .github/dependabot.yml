@@ -1,0 +1,50 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/npm/rust-just"
+    schedule:
+      interval: "daily"
+      time: "05:30"
+      timezone: "Asia/Kolkata"
+    commit-message:
+      prefix: "deps (minor)"
+      include: "scope"
+    open-pull-requests-limit: 10
+    labels:
+      - "🚀 deps"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/npm/rust-just"
+    schedule:
+      interval: "daily"
+      time: "05:30"
+      timezone: "Asia/Kolkata"
+    commit-message:
+      prefix: "deps (major)"
+      include: "scope"
+    open-pull-requests-limit: 5
+    assignees:
+      - "gnpaone"
+    reviewers:
+      - "gnpaone"
+    labels:
+      - "🚀 deps"
+    allow:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    commit-message:
+      prefix: "actions"
+      include: "scope"
+    open-pull-requests-limit: 10
+      - "gnpaone"
+    labels:
+      - "🚀 deps"
