@@ -6,6 +6,7 @@
 name: PIP Release
 
 on:
+  workflow_dispatch:
   repository_dispatch:
     types: [pip-release]
 
