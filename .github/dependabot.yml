@@ -22,6 +22,5 @@ updates:
       prefix: "actions"
       include: "scope"
     open-pull-requests-limit: 10
-      - "gnpaone"
     labels:
       - "🚀 deps"
