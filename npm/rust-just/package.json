@@ -37,16 +37,16 @@
   },
   "homepage": "https://github.com/gnpaone/rust-just/tree/master/npm#readme",
   "dependencies": {
-    "execa": "^9.4.1",
+    "execa": "^9.5.2",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
-    "@types/node": "^20.11.22",
-    "@typescript-eslint/eslint-plugin": "^7.1.0",
-    "@typescript-eslint/parser": "^7.1.0",
-    "eslint": "^8.57.0",
-    "tsup": "^8.0.2",
-    "typescript": "^5.3.3"
+    "@types/node": "^22.10.10",
+    "@typescript-eslint/eslint-plugin": "^8.21.0",
+    "@typescript-eslint/parser": "^8.21.0",
+    "eslint": "^9.18.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3"
   },
   "optionalDependencies": {
     "rust-just-darwin-arm64": "1.39.0",
