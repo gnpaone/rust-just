@@ -71,6 +71,4 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           event-type: ${{ matrix.events }}
-          # client-payload: >
-          #   {"tag": "${{ steps.latesttag.outputs.tag }}"}
           
