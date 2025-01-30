@@ -16,8 +16,6 @@ jobs:
         uses: dependabot/fetch-metadata@v2
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
-      - name: Log metadata
-        run: echo "${{ toJSON(steps.metadata.outputs) }}"
       - name: Create table from dependabot metadata
         id: meta-table
         uses: parkerbxyz/json-to-markdown-table@v1.1.2
@@ -29,18 +27,18 @@ jobs:
           message: ${{ steps.meta-table.outputs.table }}
           pr-number: ${{ github.event.pull_request.number }}
       - name: Checkout PR branch
-        if: steps.metadata.outputs.package-ecosystem == 'npm'
+        if: steps.metadata.outputs.package-ecosystem == 'npm_and_yarn'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
       - name: Install node
-        if: steps.metadata.outputs.package-ecosystem == 'npm'
+        if: steps.metadata.outputs.package-ecosystem == 'npm_and_yarn'
         uses: actions/setup-node@v4
         with:
           node-version: 18
           registry-url: "https://registry.npmjs.org"
       - name: Build package
-        if: steps.metadata.outputs.package-ecosystem == 'npm'
+        if: steps.metadata.outputs.package-ecosystem == 'npm_and_yarn'
         shell: bash
         working-directory: npm/rust-just
         continue-on-error: true
@@ -49,7 +47,7 @@ jobs:
           yarn install --frozen-lockfile
           yarn build
       - name: Comment the build error message
-        if: steps.metadata.outputs.package-ecosystem == 'npm' && steps.build.outcome == 'failure'
+        if: steps.metadata.outputs.package-ecosystem == 'npm_and_yarn' && steps.build.outcome == 'failure'
         uses: thollander/actions-comment-pull-request@v3
         with:
           message: |
@@ -59,7 +57,7 @@ jobs:
             ```
           pr-number: ${{ github.event.pull_request.number }}
       - name: Assign me as assignee
-        if: steps.metadata.outputs.package-ecosystem == 'npm' && (steps.metadata.outputs.update-type == 'version-update:semver-major' || steps.build.outcome == 'failure')
+        if: steps.metadata.outputs.package-ecosystem == 'npm_and_yarn' && (steps.metadata.outputs.update-type == 'version-update:semver-major' || steps.build.outcome == 'failure')
         uses: actions/github-script@v7
         with:
           script: |
@@ -74,7 +72,7 @@ jobs:
               core.setFailed(error.message);
             }
       - name: Enable auto-merge for Dependabot PRs
-        if: ${{ !(steps.metadata.outputs.package-ecosystem == 'npm' && (steps.metadata.outputs.update-type == 'version-update:semver-major' || steps.build.outcome == 'failure')) }}
+        if: ${{ !(steps.metadata.outputs.package-ecosystem == 'npm_and_yarn' && (steps.metadata.outputs.update-type == 'version-update:semver-major' || steps.build.outcome == 'failure')) }}
         run: gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
