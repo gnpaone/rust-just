@@ -118,7 +118,7 @@ jobs:
           node-version: 18
           registry-url: "https://registry.npmjs.org"
       - name: Wait for npm repository to index the binaries
-        uses: AliSajid/random-wait-action@v2.7.1
+        uses: AliSajid/random-wait-action@v2.8.0
         with:
           minimum: 30
           maximum: 60
