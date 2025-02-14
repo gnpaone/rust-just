@@ -2445,6 +2445,7 @@ __metadata:
     rust-just-windows-x64:
       optional: true
   bin:
+    just: lib/index.mjs
     rust-just: lib/index.mjs
   languageName: unknown
   linkType: soft

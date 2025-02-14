@@ -48,7 +48,7 @@ The recommended way to install `rust-just` is as a global dependency:
 and then run with:
 
 ```
-~/$ rust-just [OPTIONS] [ARGUMENTS]...
+~/$ just [OPTIONS] [ARGUMENTS]...
 ```
 
 ### Installation as local dependency
@@ -64,7 +64,7 @@ and then run with:
 > For example:
 > 
 > ```
-> ~/$ rust-just --execaoptions '{"stdio": "inherit", "reject": false}' [OPTIONS] [ARGUMENTS]...
+> ~/$ just --execaoptions '{"stdio": "inherit", "reject": false}' [OPTIONS] [ARGUMENTS]...
 > ```
 > 
 > For a complete list of available Execa options, refer to the [Execa API documentation](https://github.com/sindresorhus/execa/blob/main/docs/api.md#options-1).

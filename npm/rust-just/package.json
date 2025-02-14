@@ -2,7 +2,10 @@
   "name": "rust-just",
   "version": "1.39.0",
   "description": "🤖 Just a command runner",
-  "bin": "lib/index.mjs",
+  "bin": {
+    "just": "lib/index.mjs",
+    "rust-just": "lib/index.mjs"
+  },
   "exports": {
     ".": {
       "import": "./lib/index.mjs"
