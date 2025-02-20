@@ -59,7 +59,7 @@ and then run with:
 ~/$ npm install rust-just
 ```
 
-> **Note:** To pass Execa options to `rust-just`, use the `--execaoptions <OPTIONS>` flag, where `OPTIONS` is in JSON format.
+> **Note:** To pass Execa options to `just`, use the `--execaoptions <OPTIONS>` flag, where `OPTIONS` is in JSON format.
 >
 > For example:
 > 
