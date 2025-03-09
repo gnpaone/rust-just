@@ -59,7 +59,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Download release artifact
-        uses: robinraju/release-downloader@v1.11
+        uses: robinraju/release-downloader@v1.12
         with:
           tag: ${{ needs.find-latest-tag.outputs.tag }}
           fileName: just-${{ needs.find-latest-tag.outputs.tag }}-${{ matrix.TARGET }}.*
