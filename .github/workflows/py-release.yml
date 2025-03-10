@@ -8,7 +8,7 @@ name: PIP Release
 on:
   workflow_dispatch:
   repository_dispatch:
-    types: [pip-release]
+    types: [platform-release]
 
 permissions:
   contents: read
@@ -16,7 +16,6 @@ permissions:
 jobs:
   linux:
     runs-on: ${{ matrix.runner }}
-    if: github.actor == 'gnpaone'
     strategy:
       matrix:
         runner: [ubuntu-latest]
@@ -46,7 +45,6 @@ jobs:
 
   musllinux:
     runs-on: ${{ matrix.runner }}
-    if: github.actor == 'gnpaone'
     strategy:
       matrix:
         runner: [ubuntu-latest]
@@ -76,7 +74,6 @@ jobs:
 
   windows:
     runs-on: ${{ matrix.runner }}
-    if: github.actor == 'gnpaone'
     strategy:
       matrix:
         runner: [windows-latest]
@@ -105,7 +102,6 @@ jobs:
 
   macos:
     runs-on: ${{ matrix.runner }}
-    if: github.actor == 'gnpaone'
     strategy:
       matrix:
         runner: [macos-14]
@@ -134,7 +130,6 @@ jobs:
 
   sdist:
     runs-on: ubuntu-latest
-    if: github.actor == 'gnpaone'
     steps:
       - uses: actions/checkout@v4
       - name: Copy README.md and LICENSE
@@ -159,8 +154,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    # if: startsWith(github.ref, 'refs/tags/') && github.actor == 'gnpaone'
-    if: github.actor == 'gnpaone'
+    # if: startsWith(github.ref, 'refs/tags/')
     needs: [linux, musllinux, windows, macos, sdist]
     steps:
       - uses: actions/download-artifact@v4
