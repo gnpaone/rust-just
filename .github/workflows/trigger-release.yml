@@ -47,8 +47,6 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.check.outputs.create_release == 'true'
     needs: check
-    outputs:
-      copy_release: ${{ steps.copy_release.outcome }}
     steps:
       - name: Copy Release
         id: copy_release
@@ -59,16 +57,9 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ needs.check.outputs.source_tag }}
 
-  platform-release:
-    runs-on: ubuntu-latest
-    if: needs.release.outputs.copy_release == 'success'
-    needs: release
-    strategy:
-      matrix:
-        events: ['npm-release', 'pip-release']
-    steps:
       - name: Trigger release event
+        if: steps.copy_release.outcome == 'success'
         uses: peter-evans/repository-dispatch@v3
         with:
-          event-type: ${{ matrix.events }}
+          event-type: platform-release
           
