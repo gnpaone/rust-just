@@ -25,7 +25,7 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/gnpaone/rust-just"
-Documentation = "https://github.com/casey/just"
+Documentation = "https://just.systems/man/en"
 Changelog = "https://github.com/casey/just/blob/master/CHANGELOG.md"
 
 [tool.maturin]
