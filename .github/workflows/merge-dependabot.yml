@@ -18,7 +18,7 @@ jobs:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
       - name: Create table from dependabot metadata
         id: meta-table
-        uses: parkerbxyz/json-to-markdown-table@v1.1.2
+        uses: parkerbxyz/json-to-markdown-table@v1.1.3
         with:
           json: ${{ steps.metadata.outputs.updated-dependencies-json }}
       - name: Comment the table in PR
