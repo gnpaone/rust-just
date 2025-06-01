@@ -41,7 +41,7 @@
   "homepage": "https://github.com/gnpaone/rust-just/tree/master/npm#readme",
   "dependencies": {
     "execa": "^9.5.2",
-    "yargs": "^17.7.2"
+    "yargs": "^18.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.10",
@@ -79,6 +79,6 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18.19 || >=20.6 || >=21"
+    "node": ">=20.19.0"
   }
 }
