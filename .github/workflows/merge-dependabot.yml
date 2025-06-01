@@ -44,7 +44,7 @@ jobs:
         continue-on-error: true
         id: build
         run: |
-          yarn install --frozen-lockfile
+          yarn install --immutable --immutable-cache
           yarn build
       - name: Comment the build error message
         if: steps.metadata.outputs.package-ecosystem == 'npm_and_yarn' && steps.build.outcome == 'failure'
