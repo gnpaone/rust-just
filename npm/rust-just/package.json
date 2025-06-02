@@ -40,7 +40,7 @@
   },
   "homepage": "https://github.com/gnpaone/rust-just/tree/master/npm#readme",
   "dependencies": {
-    "execa": "^9.5.2",
+    "execa": "^9.6.0",
     "yargs": "^18.0.0"
   },
   "devDependencies": {
