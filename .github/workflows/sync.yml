@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           rm -rf ./.sync-repo/.git  
-          rsync -av --exclude='.github/' ./.sync-repo/ .
+          rsync -av --checksum --exclude='.github/' ./.sync-repo/ .
           rm -rf ./.sync-repo/
   
       - name: Create PR
