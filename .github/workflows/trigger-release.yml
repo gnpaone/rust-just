@@ -59,7 +59,7 @@ jobs:
 
       - name: Trigger release event
         if: steps.copy_release.outcome == 'success'
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@v4
         with:
           event-type: platform-release
           
