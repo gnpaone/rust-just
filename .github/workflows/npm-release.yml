@@ -74,7 +74,7 @@ jobs:
             tar -xzf ./release/just-${{ needs.find-latest-tag.outputs.tag }}-${{ matrix.TARGET }}.tar.gz -C ./target/${{ matrix.TARGET }}/release/
           fi
       - name: Install node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: 18
           registry-url: "https://registry.npmjs.org"
@@ -113,7 +113,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Install node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: 18
           registry-url: "https://registry.npmjs.org"
