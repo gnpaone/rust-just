@@ -70,6 +70,19 @@ jobs:
           ref: master
           path: just_source
 
+      - name: Verify CHANGELOG.md contains the tag
+        if: steps.src_rel.outputs.body == ''
+        run: |
+          TAG="${{ needs.check.outputs.source_tag }}"
+          FILE="just_source/CHANGELOG.md"
+
+          if ! grep -q "^\[${TAG}\]" "$FILE"; then
+            echo "::error title=Tag not found in CHANGELOG::Could not find [${TAG}] in ${FILE}"
+            exit 1
+          fi
+
+          echo "Found release header for ${TAG}"
+
       - name: Extract release notes from CHANGELOG.md
         id: changelog
         if: steps.src_rel.outputs.body == ''
@@ -77,42 +90,35 @@ jobs:
           TAG="${{ needs.check.outputs.source_tag }}"
           FILE="just_source/CHANGELOG.md"
 
-          # Extract lines until the next version heading (start of next digit)
-          awk "/^${TAG} - /{flag=1; next} /^([0-9]+\.[0-9]+\.[0-9]+)/{flag=0} flag" "$FILE" > raw.txt
+          awk "/^\[${TAG}\]/ {flag=1; next} /^\[[0-9]+\.[0-9]+\.[0-9]+]/ {flag=0} flag" "$FILE" > raw.txt
 
-          # Trim whitespace
           sed -i 's/^[ \t]*//' raw.txt
 
           echo "notes<<EOF" >> $GITHUB_OUTPUT
           cat raw.txt >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Create release (fallback)
+      - name: Copy release body override
+        id: copy_rel_over
         if: steps.src_rel.outputs.body == ''
-        uses: actions/github-script@v8
-        with:
-          script: |
-            await github.rest.repos.createRelease({
-              owner: "gnpaone",
-              repo: "rust-just",
-              tag_name: "${{ needs.check.outputs.source_tag }}",
-              name: "${{ needs.check.outputs.source_tag }}",
-              body: `${{ steps.changelog.outputs.notes }}`
-            });
-
-      - name: Copy release normally
-        if: steps.src_rel.outputs.body != ''
-        uses: marchbold/copy-release-to-repository-action@v2
+        uses: gnpaone/copy-release@v1.0.0
         with:
           source_repo: 'casey/just'
-          destination_repo: 'gnpaone/rust-just'
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ needs.check.outputs.source_tag }}
+          override_body: ${{ steps.changelog.outputs.notes }}
+
+      - name: Copy release normally
+        id: copy_rel_norm
+        if: steps.src_rel.outputs.body != ''
+        uses: gnpaone/copy-release@v1.0.0
+        with:
+          source_repo: 'casey/just'
           tag: ${{ needs.check.outputs.source_tag }}
 
       - name: Trigger release event
         if: |
-          (steps.src_rel.outputs.body != '' && steps.copy_release.outcome == 'success') ||
-          (steps.src_rel.outputs.body == '')
+          (steps.src_rel.outputs.body != '' && steps.copy_rel_norm.outcome == 'success') ||
+          (steps.src_rel.outputs.body == '' && steps.copy_rel_over.outcome == 'success')
         uses: peter-evans/repository-dispatch@v4
         with:
           event-type: platform-release
