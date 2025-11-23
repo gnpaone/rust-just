@@ -28,7 +28,7 @@ jobs:
           pr-number: ${{ github.event.pull_request.number }}
       - name: Checkout PR branch
         if: steps.metadata.outputs.package-ecosystem == 'npm_and_yarn'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.ref }}
       - name: Install node

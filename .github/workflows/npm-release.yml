@@ -57,7 +57,7 @@ jobs:
             TARGET: aarch64-apple-darwin
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Download release artifact
         uses: robinraju/release-downloader@v1.12
         with:
@@ -111,7 +111,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Install node
         uses: actions/setup-node@v6
         with:

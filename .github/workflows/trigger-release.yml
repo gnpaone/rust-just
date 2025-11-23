@@ -63,7 +63,7 @@ jobs:
 
       - name: Checkout just repo to read CHANGELOG
         if: steps.src_rel.outputs.body == ''
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: casey/just
           token: ${{ secrets.GITHUB_TOKEN }}
