@@ -101,7 +101,7 @@ jobs:
       - name: Copy release body override
         id: copy_rel_over
         if: steps.src_rel.outputs.body == ''
-        uses: gnpaone/copy-repo-release@v1.0.1
+        uses: gnpaone/copy-repo-release@v1.1.1
         with:
           source_repo: 'casey/just'
           tag: ${{ needs.check.outputs.source_tag }}
@@ -110,7 +110,7 @@ jobs:
       - name: Copy release normally
         id: copy_rel_norm
         if: steps.src_rel.outputs.body != ''
-        uses: gnpaone/copy-repo-release@v1.0.1
+        uses: gnpaone/copy-repo-release@v1.1.1
         with:
           source_repo: 'casey/just'
           tag: ${{ needs.check.outputs.source_tag }}
