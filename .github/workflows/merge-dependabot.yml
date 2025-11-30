@@ -71,7 +71,7 @@ jobs:
             } catch (error) {
               core.setFailed(error.message);
             }
-      - name: Enable auto-merge for Dependabot PRs
+      - name: Merge Dependabot PR
         if: ${{ !(steps.metadata.outputs.package-ecosystem == 'npm_and_yarn' && (steps.metadata.outputs.update-type == 'version-update:semver-major' || steps.build.outcome == 'failure')) }}
         run: gh pr merge --merge -R gnpaone/rust-just "$PR_URL"
         env:
