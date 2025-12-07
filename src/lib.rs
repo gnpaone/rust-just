@@ -39,6 +39,7 @@ pub(crate) use {
     execution_context::ExecutionContext,
     executor::Executor,
     expression::Expression,
+    format_string_part::FormatStringPart,
     fragment::Fragment,
     function::Function,
     interpreter::Interpreter,
@@ -83,6 +84,7 @@ pub(crate) use {
     string_delimiter::StringDelimiter,
     string_kind::StringKind,
     string_literal::StringLiteral,
+    string_state::StringState,
     subcommand::Subcommand,
     suggestion::Suggestion,
     table::Table,
@@ -215,6 +217,7 @@ mod evaluator;
 mod execution_context;
 mod executor;
 mod expression;
+mod format_string_part;
 mod fragment;
 mod function;
 mod interpreter;
@@ -262,6 +265,7 @@ mod source;
 mod string_delimiter;
 mod string_kind;
 mod string_literal;
+mod string_state;
 mod subcommand;
 mod suggestion;
 mod table;
