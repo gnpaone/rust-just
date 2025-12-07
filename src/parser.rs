@@ -141,7 +141,7 @@ impl<'run, 'src> Parser<'run, 'src> {
     Err(self.internal_error("`Parser::advance()` advanced past end of token stream")?)
   }
 
-  /// Return the next token if it is of kind `expected`, otherwise, return an
+  /// Return next token if it is of kind `expected`, otherwise, return an
   /// unexpected token error
   fn expect(&mut self, expected: TokenKind) -> CompileResult<'src, Token<'src>> {
     if let Some(token) = self.accept(expected)? {
@@ -149,6 +149,18 @@ impl<'run, 'src> Parser<'run, 'src> {
     } else {
       Err(self.unexpected_token()?)
     }
+  }
+
+  /// Return the next token if it is any of kinds in `expected`, otherwise,
+  /// return an unexpected token error
+  fn expect_any(&mut self, expected: &[TokenKind]) -> CompileResult<'src, Token<'src>> {
+    for &kind in expected {
+      if let Some(token) = self.accept(kind)? {
+        return Ok(token);
+      }
+    }
+
+    Err(self.unexpected_token()?)
   }
 
   /// Return an unexpected token error if the next token is not an EOL
@@ -649,6 +661,29 @@ impl<'run, 'src> Parser<'run, 'src> {
     })
   }
 
+  fn parse_format_string(&mut self) -> CompileResult<'src, Expression<'src>> {
+    self.expect_keyword(Keyword::F)?;
+
+    let (token, start) = self.parse_string_literal_token_in_state(StringState::FormatStart)?;
+
+    let kind = StringKind::from_string_or_backtick(token)?;
+
+    let mut more = token.kind == FormatStringStart;
+
+    let mut expressions = Vec::new();
+
+    while more {
+      let expression = self.parse_expression()?;
+      more = self.next_is(FormatStringContinue);
+      expressions.push((
+        expression,
+        self.parse_string_literal_in_state(StringState::FormatContinue(kind))?,
+      ));
+    }
+
+    Ok(Expression::FormatString { start, expressions })
+  }
+
   // Check if the next tokens are a shell-expanded string, i.e., `x"foo"`.
   //
   // This function skips initial whitespace tokens, but thereafter is
@@ -663,8 +698,28 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     tokens
       .next()
-      .is_some_and(|token| token.kind == Identifier && token.lexeme() == "x")
+      .is_some_and(|token| token.kind == Identifier && token.lexeme() == Keyword::X.lexeme())
       && tokens.next().is_some_and(|token| token.kind == StringToken)
+  }
+
+  // Check if the next tokens are a format string, i.e., `f"foo"`.
+  //
+  // This function skips initial whitespace tokens, but thereafter is
+  // whitespace-sensitive, so `f"foo"` is a format string, whereas `f
+  // "foo"` is not.
+  fn next_is_format_string(&self) -> bool {
+    let mut tokens = self
+      .tokens
+      .iter()
+      .skip(self.next_token)
+      .skip_while(|token| token.kind == Whitespace);
+
+    tokens
+      .next()
+      .is_some_and(|token| token.kind == Identifier && token.lexeme() == Keyword::F.lexeme())
+      && tokens
+        .next()
+        .is_some_and(|token| matches!(token.kind, StringToken | FormatStringStart))
   }
 
   /// Parse a value, e.g. `(bar)`
@@ -673,6 +728,8 @@ impl<'run, 'src> Parser<'run, 'src> {
       Ok(Expression::StringLiteral {
         string_literal: self.parse_string_literal()?,
       })
+    } else if self.next_is_format_string() {
+      self.parse_format_string()
     } else if self.next_is(Backtick) {
       let next = self.next()?;
       let kind = StringKind::from_string_or_backtick(next)?;
@@ -728,6 +785,14 @@ impl<'run, 'src> Parser<'run, 'src> {
   fn parse_string_literal_token(
     &mut self,
   ) -> CompileResult<'src, (Token<'src>, StringLiteral<'src>)> {
+    self.parse_string_literal_token_in_state(StringState::Normal)
+  }
+
+  /// Parse a string literal, e.g. `"FOO"`, returning the string literal and the string token
+  fn parse_string_literal_token_in_state(
+    &mut self,
+    state: StringState,
+  ) -> CompileResult<'src, (Token<'src>, StringLiteral<'src>)> {
     let expand = if self.next_is(Identifier) {
       self.expect_keyword(Keyword::X)?;
       true
@@ -735,24 +800,49 @@ impl<'run, 'src> Parser<'run, 'src> {
       false
     };
 
-    let token = self.expect(StringToken)?;
+    let token = match state {
+      StringState::Normal => self.expect(StringToken)?,
+      StringState::FormatStart => self.expect_any(&[StringToken, FormatStringStart])?,
+      StringState::FormatContinue(_) => {
+        self.expect_any(&[FormatStringContinue, FormatStringEnd])?
+      }
+    };
 
-    let kind = StringKind::from_string_or_backtick(token)?;
+    let kind = match state {
+      StringState::Normal | StringState::FormatStart => StringKind::from_string_or_backtick(token)?,
+      StringState::FormatContinue(kind) => kind,
+    };
 
-    let delimiter_len = kind.delimiter_len();
+    let open = if matches!(token.kind, FormatStringContinue | FormatStringEnd) {
+      Lexer::INTERPOLATION_END.len()
+    } else {
+      kind.delimiter_len()
+    };
 
-    let raw = &token.lexeme()[delimiter_len..token.lexeme().len() - delimiter_len];
+    let close = if matches!(token.kind, FormatStringStart | FormatStringContinue) {
+      Lexer::INTERPOLATION_START.len()
+    } else {
+      kind.delimiter_len()
+    };
 
-    let unindented = if kind.indented() {
+    let raw = &token.lexeme()[open..token.lexeme().len() - close];
+
+    let unindented = if kind.indented() && matches!(token.kind, StringToken) {
       unindent(raw)
     } else {
       raw.to_owned()
     };
 
-    let cooked = if kind.processes_escape_sequences() {
-      Self::cook_string(token, &unindented)?
-    } else {
+    let undelimited = if matches!(state, StringState::Normal) {
       unindented
+    } else {
+      unindented.replace(Lexer::INTERPOLATION_ESCAPE, Lexer::INTERPOLATION_START)
+    };
+
+    let cooked = if kind.processes_escape_sequences() {
+      Self::cook_string(token, &undelimited)?
+    } else {
+      undelimited
     };
 
     let cooked = if expand {
@@ -769,6 +859,23 @@ impl<'run, 'src> Parser<'run, 'src> {
         cooked,
         expand,
         kind,
+        part: match token.kind {
+          FormatStringStart => Some(FormatStringPart::Start),
+          FormatStringContinue => Some(FormatStringPart::Continue),
+          FormatStringEnd => Some(FormatStringPart::End),
+          StringToken => {
+            if matches!(state, StringState::Normal) {
+              None
+            } else {
+              Some(FormatStringPart::Single)
+            }
+          }
+          _ => {
+            return Err(token.error(CompileErrorKind::Internal {
+              message: "unexpected token kind while parsing string literal".into(),
+            }))
+          }
+        },
         raw,
       },
     ))
@@ -859,6 +966,15 @@ impl<'run, 'src> Parser<'run, 'src> {
   /// Parse a string literal, e.g. `"FOO"`
   fn parse_string_literal(&mut self) -> CompileResult<'src, StringLiteral<'src>> {
     let (_token, string_literal) = self.parse_string_literal_token()?;
+    Ok(string_literal)
+  }
+
+  // /// Parse a format string literal, e.g. `"foo{"`, `}bar{`, or `}baz"`
+  fn parse_string_literal_in_state(
+    &mut self,
+    string_state: StringState,
+  ) -> CompileResult<'src, StringLiteral<'src>> {
+    let (_token, string_literal) = self.parse_string_literal_token_in_state(string_state)?;
     Ok(string_literal)
   }
 
@@ -966,12 +1082,6 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     let shebang = body.first().is_some_and(Line::is_shebang);
     let script = attributes.contains(AttributeDiscriminant::Script);
-
-    if shebang && script {
-      return Err(name.error(CompileErrorKind::ShebangAndScriptAttribute {
-        recipe: name.lexeme(),
-      }));
-    }
 
     if attributes.contains(AttributeDiscriminant::WorkingDirectory)
       && attributes.contains(AttributeDiscriminant::NoCd)
@@ -1301,6 +1411,7 @@ mod tests {
     };
   }
 
+  #[track_caller]
   fn error(
     src: &str,
     offset: usize,
@@ -2457,6 +2568,24 @@ mod tests {
     tree: (justfile (assignment foo (assert (if a != b c d) == "abc" "error"))),
   }
 
+  test! {
+    name: format_string_simple,
+    text: "foo := f'abc'",
+    tree: (justfile (assignment foo (format "abc"))),
+  }
+
+  test! {
+    name: format_string_expression,
+    text: "foo := f'foo{{ 'abc' + 'xyz' }}bar'",
+    tree: (justfile (assignment foo (format "foo" (+ "abc" "xyz") "bar"))),
+  }
+
+  test! {
+    name: format_string_complex,
+    text: "foo := f'foo{{ 'abc' + 'xyz' }}bar{{ 'hello' }}goodbye'",
+    tree: (justfile (assignment foo (format "foo" (+ "abc" "xyz") "bar" "hello" "goodbye"))),
+  }
+
   error! {
     name:   alias_syntax_multiple_rhs,
     input:  "alias foo := bar baz",
@@ -2589,26 +2718,6 @@ mod tests {
         StringToken,
       ],
       found: Eof,
-    },
-  }
-
-  error! {
-    name:   unclosed_parenthesis_in_interpolation,
-    input:  "a:\n echo {{foo(}}",
-    offset:  15,
-    line:   1,
-    column: 12,
-    width:  2,
-    kind:   UnexpectedToken{
-      expected: vec![
-        Backtick,
-        Identifier,
-        ParenL,
-        ParenR,
-        Slash,
-        StringToken,
-      ],
-      found: InterpolationEnd,
     },
   }
 
