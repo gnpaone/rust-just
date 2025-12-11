@@ -44,7 +44,7 @@
     "yargs": "^18.0.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.1",
+    "@types/node": "^25.0.0",
     "@typescript-eslint/eslint-plugin": "^8.21.0",
     "@typescript-eslint/parser": "^8.21.0",
     "eslint": "^9.18.0",
