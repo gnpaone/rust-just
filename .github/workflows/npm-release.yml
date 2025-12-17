@@ -76,7 +76,7 @@ jobs:
       - name: Install node
         uses: actions/setup-node@v6
         with:
-          node-version: 18
+          node-version: 24
           registry-url: "https://registry.npmjs.org"
       - name: Publish to NPM
         shell: bash
@@ -115,7 +115,7 @@ jobs:
       - name: Install node
         uses: actions/setup-node@v6
         with:
-          node-version: 18
+          node-version: 24
           registry-url: "https://registry.npmjs.org"
       - name: Wait for npm repository to index the binaries
         uses: AliSajid/random-wait-action@v2.11.1
