@@ -53,8 +53,11 @@ struct Parameter<'a> {
   default: Option<&'a str>,
   export: bool,
   kind: &'a str,
+  long: Option<&'a str>,
   name: &'a str,
   pattern: Option<&'a str>,
+  short: Option<char>,
+  value: Option<&'a str>,
 }
 
 #[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -1036,6 +1039,155 @@ fn format_string() {
             ["concatenate", "baz", "buzz"],
             "123"
           ]),
+          ..default()
+        },
+      )]
+      .into(),
+      ..default()
+    },
+  );
+}
+
+#[test]
+fn arg_pattern() {
+  case(
+    "[arg('bar', pattern='BAR')]\nfoo bar:",
+    Module {
+      first: Some("foo"),
+      recipes: [(
+        "foo",
+        Recipe {
+          name: "foo",
+          namepath: "foo",
+          attributes: [json!({
+            "arg": {
+              "long": null,
+              "name": "bar",
+              "pattern": "BAR",
+              "short": null,
+              "value": null,
+            }
+          })]
+          .into(),
+          parameters: [Parameter {
+            kind: "singular",
+            name: "bar",
+            pattern: Some("BAR"),
+            ..default()
+          }]
+          .into(),
+          ..default()
+        },
+      )]
+      .into(),
+      ..default()
+    },
+  );
+}
+
+#[test]
+fn arg_long() {
+  case(
+    "[arg('bar', long='BAR')]\nfoo bar:",
+    Module {
+      first: Some("foo"),
+      recipes: [(
+        "foo",
+        Recipe {
+          name: "foo",
+          namepath: "foo",
+          attributes: [json!({
+            "arg": {
+              "long": "BAR",
+              "name": "bar",
+              "pattern": null,
+              "short": null,
+              "value": null,
+            }
+          })]
+          .into(),
+          parameters: [Parameter {
+            kind: "singular",
+            name: "bar",
+            long: Some("BAR"),
+            ..default()
+          }]
+          .into(),
+          ..default()
+        },
+      )]
+      .into(),
+      ..default()
+    },
+  );
+}
+
+#[test]
+fn arg_short() {
+  case(
+    "[arg('bar', short='B')]\nfoo bar:",
+    Module {
+      first: Some("foo"),
+      recipes: [(
+        "foo",
+        Recipe {
+          name: "foo",
+          namepath: "foo",
+          attributes: [json!({
+            "arg": {
+              "long": null,
+              "name": "bar",
+              "pattern": null,
+              "short": "B",
+              "value": null,
+            }
+          })]
+          .into(),
+          parameters: [Parameter {
+            kind: "singular",
+            name: "bar",
+            short: Some('B'),
+            ..default()
+          }]
+          .into(),
+          ..default()
+        },
+      )]
+      .into(),
+      ..default()
+    },
+  );
+}
+
+#[test]
+fn arg_value() {
+  case(
+    "[arg('bar', short='B', value='hello')]\nfoo bar:",
+    Module {
+      first: Some("foo"),
+      recipes: [(
+        "foo",
+        Recipe {
+          name: "foo",
+          namepath: "foo",
+          attributes: [json!({
+            "arg": {
+              "long": null,
+              "name": "bar",
+              "pattern": null,
+              "short": "B",
+              "value": "hello",
+            }
+          })]
+          .into(),
+          parameters: [Parameter {
+            kind: "singular",
+            name: "bar",
+            short: Some('B'),
+            value: Some("hello"),
+            ..default()
+          }]
+          .into(),
           ..default()
         },
       )]

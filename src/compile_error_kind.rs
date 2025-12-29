@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum CompileErrorKind<'src> {
+  ArgAttributeValueRequiresOption,
   ArgumentPatternRegex {
     source: regex::Error,
   },
@@ -37,6 +38,10 @@ pub(crate) enum CompileErrorKind<'src> {
   },
   DuplicateDefault {
     recipe: &'src str,
+  },
+  DuplicateOption {
+    recipe: &'src str,
+    option: Switch,
   },
   DuplicateParameter {
     recipe: &'src str,
@@ -82,7 +87,7 @@ pub(crate) enum CompileErrorKind<'src> {
   InvalidAttribute {
     item_kind: &'static str,
     item_name: &'src str,
-    attribute: Attribute<'src>,
+    attribute: Box<Attribute<'src>>,
   },
   InvalidEscapeSequence {
     character: char,
@@ -97,6 +102,12 @@ pub(crate) enum CompileErrorKind<'src> {
   },
   NoCdAndWorkingDirectoryAttribute {
     recipe: &'src str,
+  },
+  OptionNameContainsEqualSign {
+    parameter: String,
+  },
+  OptionNameEmpty {
+    parameter: String,
   },
   ParameterFollowsVariadicParameter {
     parameter: &'src str,
@@ -113,6 +124,9 @@ pub(crate) enum CompileErrorKind<'src> {
   },
   ShellExpansion {
     err: shellexpand::LookupError<env::VarError>,
+  },
+  ShortOptionWithMultipleCharacters {
+    parameter: String,
   },
   UndefinedArgAttribute {
     argument: String,
@@ -175,4 +189,5 @@ pub(crate) enum CompileErrorKind<'src> {
   UnterminatedBacktick,
   UnterminatedInterpolation,
   UnterminatedString,
+  VariadicParameterWithOption,
 }
