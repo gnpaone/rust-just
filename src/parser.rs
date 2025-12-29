@@ -873,7 +873,7 @@ impl<'run, 'src> Parser<'run, 'src> {
           _ => {
             return Err(token.error(CompileErrorKind::Internal {
               message: "unexpected token kind while parsing string literal".into(),
-            }))
+            }));
           }
         },
         raw,
@@ -916,7 +916,7 @@ impl<'run, 'src> Parser<'run, 'src> {
             '\n' => {}
             '"' => cooked.push('"'),
             character => {
-              return Err(token.error(CompileErrorKind::InvalidEscapeSequence { character }))
+              return Err(token.error(CompileErrorKind::InvalidEscapeSequence { character }));
             }
           }
           state = State::Initial;
@@ -1026,28 +1026,66 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     let mut positional = Vec::new();
 
-    let mut arg_attributes = attributes
-      .iter()
-      .filter_map(|attribute| {
-        if let Attribute::Arg {
-          name,
-          name_token,
-          pattern,
-          ..
-        } = attribute
-        {
-          Some((
-            name.cooked.clone(),
-            ArgAttribute {
-              name: *name_token,
-              pattern: pattern.as_ref().map(|(_literal, pattern)| pattern.clone()),
-            },
-          ))
-        } else {
-          None
+    let mut longs = HashSet::new();
+    let mut shorts = HashSet::new();
+
+    let mut arg_attributes = BTreeMap::new();
+
+    for attribute in &attributes {
+      let Attribute::Arg {
+        long,
+        long_token,
+        name: arg,
+        name_token,
+        pattern,
+        short,
+        short_token,
+        value,
+        ..
+      } = attribute
+      else {
+        continue;
+      };
+
+      if let Some(option) = long {
+        if !longs.insert(&option.cooked) {
+          return Err(
+            long_token
+              .unwrap()
+              .error(CompileErrorKind::DuplicateOption {
+                option: Switch::Long(option.cooked.clone()),
+                recipe: name.lexeme(),
+              }),
+          );
         }
-      })
-      .collect::<BTreeMap<String, ArgAttribute>>();
+      }
+
+      if let Some(option) = short {
+        if !shorts.insert(&option.cooked) {
+          return Err(
+            short_token
+              .unwrap()
+              .error(CompileErrorKind::DuplicateOption {
+                option: Switch::Short(option.cooked.chars().next().unwrap()),
+                recipe: name.lexeme(),
+              }),
+          );
+        }
+      }
+
+      arg_attributes.insert(
+        arg.cooked.clone(),
+        ArgAttribute {
+          name: *name_token,
+          pattern: pattern.clone(),
+          long: long.as_ref().map(|long| long.cooked.clone()),
+          short: short
+            .as_ref()
+            .map(|short| short.cooked.chars().next().unwrap()),
+          value: value.as_ref().map(|value| value.cooked.clone()),
+        },
+      );
+    }
 
     while self.next_is(Identifier) || self.next_is(Dollar) {
       positional.push(self.parse_parameter(&mut arg_attributes, ParameterKind::Singular)?);
@@ -1174,14 +1212,31 @@ impl<'run, 'src> Parser<'run, 'src> {
       None
     };
 
+    let mut long = None;
+    let mut pattern = None;
+    let mut short = None;
+    let mut value = None;
+
+    if let Some(arg) = arg_attributes.remove(name.lexeme()) {
+      long = arg.long;
+      pattern = arg.pattern;
+      short = arg.short;
+      value = arg.value;
+    }
+
+    if kind.is_variadic() && (long.is_some() || short.is_some()) {
+      return Err(name.error(CompileErrorKind::VariadicParameterWithOption));
+    }
+
     Ok(Parameter {
       default,
       export,
       kind,
+      long,
       name,
-      pattern: arg_attributes
-        .remove(name.lexeme())
-        .and_then(|attribute| attribute.pattern),
+      pattern,
+      short,
+      value,
     })
   }
 

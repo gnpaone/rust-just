@@ -1,5 +1,6 @@
 use super::*;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(
   EnumDiscriminants, PartialEq, Debug, Clone, Serialize, Ord, PartialOrd, Eq, IntoStaticStr,
 )]
@@ -10,10 +11,20 @@ use super::*;
 #[strum_discriminants(strum(serialize_all = "kebab-case"))]
 pub(crate) enum Attribute<'src> {
   Arg {
+    long: Option<StringLiteral<'src>>,
+    #[serde(skip)]
+    long_token: Option<Token<'src>>,
     name: StringLiteral<'src>,
     #[serde(skip)]
     name_token: Token<'src>,
-    pattern: Option<(StringLiteral<'src>, Pattern)>,
+    #[serde(skip)]
+    pattern: Option<Pattern>,
+    #[serde(rename = "pattern")]
+    pattern_literal: Option<StringLiteral<'src>>,
+    short: Option<StringLiteral<'src>>,
+    #[serde(skip)]
+    short_token: Option<Token<'src>>,
+    value: Option<StringLiteral<'src>>,
   },
   Confirm(Option<StringLiteral<'src>>),
   Default,
@@ -94,18 +105,83 @@ impl<'src> Attribute<'src> {
 
     let attribute = match discriminant {
       AttributeDiscriminant::Arg => {
-        let pattern = keyword_arguments
+        let name = arguments.into_iter().next().unwrap();
+        let name_token = tokens.into_iter().next().unwrap();
+
+        let (long_token, long) =
+          if let Some((_name, token, literal)) = keyword_arguments.remove("long") {
+            if literal.cooked.contains('=') {
+              return Err(token.error(CompileErrorKind::OptionNameContainsEqualSign {
+                parameter: name.cooked,
+              }));
+            }
+
+            if literal.cooked.is_empty() {
+              return Err(token.error(CompileErrorKind::OptionNameEmpty {
+                parameter: name.cooked,
+              }));
+            }
+
+            (Some(token), Some(literal))
+          } else {
+            (None, None)
+          };
+
+        let (short_token, short) =
+          if let Some((_name, token, literal)) = keyword_arguments.remove("short") {
+            if literal.cooked.contains('=') {
+              return Err(token.error(CompileErrorKind::OptionNameContainsEqualSign {
+                parameter: name.cooked,
+              }));
+            }
+
+            if literal.cooked.is_empty() {
+              return Err(token.error(CompileErrorKind::OptionNameEmpty {
+                parameter: name.cooked,
+              }));
+            }
+
+            if literal.cooked.chars().count() != 1 {
+              return Err(
+                token.error(CompileErrorKind::ShortOptionWithMultipleCharacters {
+                  parameter: name.cooked,
+                }),
+              );
+            }
+
+            (Some(token), Some(literal))
+          } else {
+            (None, None)
+          };
+
+        let (pattern_literal, pattern) = keyword_arguments
           .remove("pattern")
           .map(|(_name, token, literal)| {
             let pattern = Pattern::new(token, &literal)?;
-            Ok((literal, pattern))
+            Ok((Some(literal), Some(pattern)))
           })
-          .transpose()?;
+          .transpose()?
+          .unwrap_or((None, None));
+
+        let value = if let Some((name, _token, literal)) = keyword_arguments.remove("value") {
+          if long.is_none() && short.is_none() {
+            return Err(name.error(CompileErrorKind::ArgAttributeValueRequiresOption));
+          }
+          Some(literal)
+        } else {
+          None
+        };
 
         Self::Arg {
-          name: arguments.into_iter().next().unwrap(),
-          name_token: tokens.into_iter().next().unwrap(),
+          long,
+          long_token,
+          name,
+          name_token,
           pattern,
+          pattern_literal,
+          short,
+          short_token,
+          value,
         }
       }
       AttributeDiscriminant::Confirm => Self::Confirm(arguments.into_iter().next()),
@@ -171,11 +247,33 @@ impl Display for Attribute<'_> {
     write!(f, "{}", self.name())?;
 
     match self {
-      Self::Arg { name, pattern, .. } => {
+      Self::Arg {
+        long,
+        long_token: _,
+        name,
+        name_token: _,
+        pattern: _,
+        pattern_literal,
+        short,
+        short_token: _,
+        value,
+      } => {
         write!(f, "({name}")?;
 
-        if let Some((literal, _pattern)) = pattern {
-          write!(f, ", pattern={literal}")?;
+        if let Some(long) = long {
+          write!(f, ", long={long}")?;
+        }
+
+        if let Some(short) = short {
+          write!(f, ", short={short}")?;
+        }
+
+        if let Some(pattern) = pattern_literal {
+          write!(f, ", pattern={pattern}")?;
+        }
+
+        if let Some(value) = value {
+          write!(f, ", value={value}")?;
         }
 
         write!(f, ")")?;
