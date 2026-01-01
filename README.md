@@ -1054,6 +1054,13 @@ Which is equivalent to:
 set NAME := true
 ```
 
+Non-boolean settings can be set to both strings and
+expressions.<sup>master</sup>
+
+However, because settings affect the behavior of backticks and many functions,
+those expressions may not contain backticks or function calls, directly or
+transitively via reference.
+
 #### Allow Duplicate Recipes
 
 If `allow-duplicate-recipes` is set to `true`, defining multiple recipes with

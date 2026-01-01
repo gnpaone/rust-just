@@ -267,15 +267,19 @@ impl<'run, 'src> Parser<'run, 'src> {
     }
   }
 
-  fn accepted_keyword(&mut self, keyword: Keyword) -> CompileResult<'src, bool> {
+  fn accept_keyword(&mut self, keyword: Keyword) -> CompileResult<'src, Option<Name<'src>>> {
     let next = self.next()?;
 
     if next.kind == Identifier && next.lexeme() == keyword.lexeme() {
       self.advance()?;
-      Ok(true)
+      Ok(Some(Name::from_identifier(next)))
     } else {
-      Ok(false)
+      Ok(None)
     }
+  }
+
+  fn accepted_keyword(&mut self, keyword: Keyword) -> CompileResult<'src, bool> {
+    Ok(self.accept_keyword(keyword)?.is_some())
   }
 
   /// Accept a dependency
@@ -533,10 +537,10 @@ impl<'run, 'src> Parser<'run, 'src> {
     attributes.ensure_valid_attributes("Assignment", *name, &[AttributeDiscriminant::Private])?;
 
     Ok(Assignment {
-      constant: false,
       export,
       file_depth: self.file_depth,
       name,
+      prelude: false,
       private: private || name.lexeme().starts_with('_'),
       value,
     })
@@ -747,13 +751,17 @@ impl<'run, 'src> Parser<'run, 'src> {
       }
       Ok(Expression::Backtick { contents, token })
     } else if self.next_is(Identifier) {
-      if self.accepted_keyword(Keyword::Assert)? {
+      if let Some(name) = self.accept_keyword(Keyword::Assert)? {
         self.expect(ParenL)?;
         let condition = self.parse_condition()?;
         self.expect(Comma)?;
         let error = Box::new(self.parse_expression()?);
         self.expect(ParenR)?;
-        Ok(Expression::Assert { condition, error })
+        Ok(Expression::Assert {
+          condition,
+          error,
+          name,
+        })
       } else {
         let name = self.parse_name()?;
 
@@ -782,9 +790,7 @@ impl<'run, 'src> Parser<'run, 'src> {
   }
 
   /// Parse a string literal, e.g. `"FOO"`, returning the string literal and the string token
-  fn parse_string_literal_token(
-    &mut self,
-  ) -> CompileResult<'src, (Token<'src>, StringLiteral<'src>)> {
+  fn parse_string_literal_token(&mut self) -> CompileResult<'src, (Token<'src>, StringLiteral)> {
     self.parse_string_literal_token_in_state(StringState::Normal)
   }
 
@@ -792,7 +798,7 @@ impl<'run, 'src> Parser<'run, 'src> {
   fn parse_string_literal_token_in_state(
     &mut self,
     state: StringState,
-  ) -> CompileResult<'src, (Token<'src>, StringLiteral<'src>)> {
+  ) -> CompileResult<'src, (Token<'src>, StringLiteral)> {
     let expand = if self.next_is(Identifier) {
       self.expect_keyword(Keyword::X)?;
       true
@@ -876,7 +882,7 @@ impl<'run, 'src> Parser<'run, 'src> {
             }));
           }
         },
-        raw,
+        raw: raw.into(),
       },
     ))
   }
@@ -964,7 +970,7 @@ impl<'run, 'src> Parser<'run, 'src> {
   }
 
   /// Parse a string literal, e.g. `"FOO"`
-  fn parse_string_literal(&mut self) -> CompileResult<'src, StringLiteral<'src>> {
+  fn parse_string_literal(&mut self) -> CompileResult<'src, StringLiteral> {
     let (_token, string_literal) = self.parse_string_literal_token()?;
     Ok(string_literal)
   }
@@ -973,7 +979,7 @@ impl<'run, 'src> Parser<'run, 'src> {
   fn parse_string_literal_in_state(
     &mut self,
     string_state: StringState,
-  ) -> CompileResult<'src, StringLiteral<'src>> {
+  ) -> CompileResult<'src, StringLiteral> {
     let (_token, string_literal) = self.parse_string_literal_token_in_state(string_state)?;
     Ok(string_literal)
   }
@@ -1345,13 +1351,13 @@ impl<'run, 'src> Parser<'run, 'src> {
     self.expect(ColonEquals)?;
 
     let set_value = match keyword {
-      Keyword::DotenvFilename => Some(Setting::DotenvFilename(self.parse_string_literal()?)),
-      Keyword::DotenvPath => Some(Setting::DotenvPath(self.parse_string_literal()?)),
+      Keyword::DotenvFilename => Some(Setting::DotenvFilename(self.parse_expression()?)),
+      Keyword::DotenvPath => Some(Setting::DotenvPath(self.parse_expression()?)),
       Keyword::ScriptInterpreter => Some(Setting::ScriptInterpreter(self.parse_interpreter()?)),
       Keyword::Shell => Some(Setting::Shell(self.parse_interpreter()?)),
-      Keyword::Tempdir => Some(Setting::Tempdir(self.parse_string_literal()?)),
+      Keyword::Tempdir => Some(Setting::Tempdir(self.parse_expression()?)),
       Keyword::WindowsShell => Some(Setting::WindowsShell(self.parse_interpreter()?)),
-      Keyword::WorkingDirectory => Some(Setting::WorkingDirectory(self.parse_string_literal()?)),
+      Keyword::WorkingDirectory => Some(Setting::WorkingDirectory(self.parse_expression()?)),
       _ => None,
     };
 
@@ -1365,16 +1371,16 @@ impl<'run, 'src> Parser<'run, 'src> {
   }
 
   /// Parse interpreter setting value, i.e., `['sh', '-eu']`
-  fn parse_interpreter(&mut self) -> CompileResult<'src, Interpreter<'src>> {
+  fn parse_interpreter(&mut self) -> CompileResult<'src, Interpreter<Expression<'src>>> {
     self.expect(BracketL)?;
 
-    let command = self.parse_string_literal()?;
+    let command = self.parse_expression()?;
 
     let mut arguments = Vec::new();
 
     if self.accepted(Comma)? {
       while !self.next_is(BracketR) {
-        arguments.push(self.parse_string_literal()?);
+        arguments.push(self.parse_expression()?);
 
         if !self.accepted(Comma)? {
           break;
@@ -2915,36 +2921,13 @@ mod tests {
     width:  1,
     kind:   UnexpectedToken {
       expected: vec![
+        Backtick,
         Identifier,
+        ParenL,
+        Slash,
         StringToken,
       ],
       found: BracketR,
-    },
-  }
-
-  error! {
-    name:   set_shell_non_literal_first,
-    input:  "set shell := ['bar' + 'baz']",
-    offset: 20,
-    line:   0,
-    column: 20,
-    width:  1,
-    kind:   UnexpectedToken {
-      expected: vec![BracketR, Comma],
-      found: Plus,
-    },
-  }
-
-  error! {
-    name:   set_shell_non_literal_second,
-    input:  "set shell := ['biz', 'bar' + 'baz']",
-    offset: 27,
-    line:   0,
-    column: 27,
-    width:  1,
-    kind:   UnexpectedToken {
-      expected: vec![BracketR, Comma],
-      found: Plus,
     },
   }
 
@@ -2957,8 +2940,11 @@ mod tests {
     width:  0,
     kind:   UnexpectedToken {
       expected: vec![
+        Backtick,
         BracketR,
         Identifier,
+        ParenL,
+        Slash,
         StringToken,
       ],
       found: Eof,
@@ -2973,7 +2959,7 @@ mod tests {
     column: 20,
     width:  0,
     kind:   UnexpectedToken {
-      expected: vec![BracketR, Comma],
+      expected: vec![AmpersandAmpersand, BarBar, BracketR, Comma, Plus, Slash],
       found: Eof,
     },
   }

@@ -1,13 +1,159 @@
 use super::*;
 
 pub(crate) struct Evaluator<'src: 'run, 'run> {
-  pub(crate) assignments: Option<&'run Table<'src, Assignment<'src>>>,
-  pub(crate) context: ExecutionContext<'src, 'run>,
-  pub(crate) is_dependency: bool,
-  pub(crate) scope: Scope<'src, 'run>,
+  assignments: Option<&'run Table<'src, Assignment<'src>>>,
+  context: Option<ExecutionContext<'src, 'run>>,
+  is_dependency: bool,
+  non_const_assignments: Table<'src, Name<'src>>,
+  scope: Scope<'src, 'run>,
 }
 
 impl<'src, 'run> Evaluator<'src, 'run> {
+  fn context(
+    &self,
+    const_error: ConstError<'src>,
+  ) -> Result<&ExecutionContext<'src, 'run>, ConstError<'src>> {
+    self.context.as_ref().ok_or(const_error)
+  }
+
+  pub(crate) fn evaluate_settings(
+    assignments: &'run Table<'src, Assignment<'src>>,
+    config: &Config,
+    name: Option<Name>,
+    sets: Table<'src, Set<'src>>,
+    scope: &'run Scope<'src, 'run>,
+  ) -> RunResult<'src, Settings> {
+    let mut scope = scope.child();
+
+    if name.is_none() {
+      let mut unknown_overrides = Vec::new();
+
+      for (name, value) in &config.overrides {
+        if let Some(assignment) = assignments.get(name) {
+          scope.bind(Binding {
+            export: assignment.export,
+            file_depth: 0,
+            name: assignment.name,
+            prelude: false,
+            private: assignment.private,
+            value: value.clone(),
+          });
+        } else {
+          unknown_overrides.push(name.clone());
+        }
+      }
+
+      if !unknown_overrides.is_empty() {
+        return Err(Error::UnknownOverrides {
+          overrides: unknown_overrides,
+        });
+      }
+    }
+
+    let mut evaluator = Self {
+      assignments: Some(assignments),
+      context: None,
+      is_dependency: false,
+      non_const_assignments: Table::new(),
+      scope,
+    };
+
+    for assignment in assignments.values() {
+      match evaluator.evaluate_assignment(assignment) {
+        Err(Error::Const { .. }) => evaluator.non_const_assignments.insert(assignment.name),
+        Err(err) => return Err(err),
+        Ok(_) => {}
+      }
+    }
+
+    evaluator.evaluate_sets(sets)
+  }
+
+  fn evaluate_sets(&mut self, sets: Table<'src, Set<'src>>) -> RunResult<'src, Settings> {
+    let mut settings = Settings::default();
+
+    for (_name, set) in sets {
+      match set.value {
+        Setting::AllowDuplicateRecipes(value) => {
+          settings.allow_duplicate_recipes = value;
+        }
+        Setting::AllowDuplicateVariables(value) => {
+          settings.allow_duplicate_variables = value;
+        }
+        Setting::DotenvFilename(value) => {
+          settings.dotenv_filename = Some(self.evaluate_expression(&value)?);
+        }
+        Setting::DotenvLoad(value) => {
+          settings.dotenv_load = value;
+        }
+        Setting::DotenvPath(value) => {
+          settings.dotenv_path = Some(self.evaluate_expression(&value)?.into());
+        }
+        Setting::DotenvOverride(value) => {
+          settings.dotenv_override = value;
+        }
+        Setting::DotenvRequired(value) => {
+          settings.dotenv_required = value;
+        }
+        Setting::Export(value) => {
+          settings.export = value;
+        }
+        Setting::Fallback(value) => {
+          settings.fallback = value;
+        }
+        Setting::IgnoreComments(value) => {
+          settings.ignore_comments = value;
+        }
+        Setting::NoExitMessage(value) => {
+          settings.no_exit_message = value;
+        }
+        Setting::PositionalArguments(value) => {
+          settings.positional_arguments = value;
+        }
+        Setting::Quiet(value) => {
+          settings.quiet = value;
+        }
+        Setting::ScriptInterpreter(value) => {
+          settings.script_interpreter = Some(self.evaluate_intepreter(&value)?);
+        }
+        Setting::Shell(value) => {
+          settings.shell = Some(self.evaluate_intepreter(&value)?);
+        }
+        Setting::Unstable(value) => {
+          settings.unstable = value;
+        }
+        Setting::WindowsPowerShell(value) => {
+          settings.windows_powershell = value;
+        }
+        Setting::WindowsShell(value) => {
+          settings.windows_shell = Some(self.evaluate_intepreter(&value)?);
+        }
+        Setting::Tempdir(value) => {
+          settings.tempdir = Some(self.evaluate_expression(&value)?);
+        }
+        Setting::WorkingDirectory(value) => {
+          settings.working_directory = Some(self.evaluate_expression(&value)?.into());
+        }
+      }
+    }
+
+    Ok(settings)
+  }
+
+  pub(crate) fn evaluate_intepreter(
+    &mut self,
+    interpreter: &Interpreter<Expression<'src>>,
+  ) -> RunResult<'src, Interpreter<String>> {
+    Ok(Interpreter {
+      command: self.evaluate_expression(&interpreter.command)?,
+      arguments: interpreter
+        .arguments
+        .iter()
+        .map(|argument| self.evaluate_expression(argument))
+        .collect::<RunResult<Vec<String>>>()?,
+    })
+  }
+
   pub(crate) fn evaluate_assignments(
     config: &'run Config,
     dotenv: &'run BTreeMap<String, String>,
@@ -33,10 +179,10 @@ impl<'src, 'run> Evaluator<'src, 'run> {
       for (name, value) in &config.overrides {
         if let Some(assignment) = module.assignments.get(name) {
           scope.bind(Binding {
-            constant: false,
             export: assignment.export,
             file_depth: 0,
             name: assignment.name,
+            prelude: false,
             private: assignment.private,
             value: value.clone(),
           });
@@ -53,10 +199,11 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     }
 
     let mut evaluator = Self {
-      context,
       assignments: Some(&module.assignments),
-      scope,
+      context: Some(context),
       is_dependency: false,
+      non_const_assignments: Table::new(),
+      scope,
     };
 
     for assignment in module.assignments.values() {
@@ -72,16 +219,25 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     if !self.scope.bound(name) {
       let value = self.evaluate_expression(&assignment.value)?;
       self.scope.bind(Binding {
-        constant: false,
         export: assignment.export,
         file_depth: 0,
         name: assignment.name,
+        prelude: false,
         private: assignment.private,
         value,
       });
     }
 
     Ok(self.scope.value(name).unwrap())
+  }
+
+  fn function_context(&self, thunk: &Thunk<'src>) -> RunResult<'src, function::Context> {
+    Ok(function::Context {
+      execution_context: self.context(ConstError::FunctionCall(thunk.name()))?,
+      is_dependency: self.is_dependency,
+      name: thunk.name(),
+      scope: &self.scope,
+    })
   }
 
   pub(crate) fn evaluate_expression(
@@ -96,29 +252,41 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         }
         self.evaluate_expression(rhs)
       }
-      Expression::Assert { condition, error } => {
+      Expression::Assert {
+        condition,
+        error,
+        name,
+      } => {
         if self.evaluate_condition(condition)? {
           Ok(String::new())
         } else {
           Err(Error::Assert {
             message: self.evaluate_expression(error)?,
+            name: *name,
           })
         }
       }
       Expression::Backtick { contents, token } => {
-        if self.context.config.dry_run {
-          Ok(format!("`{contents}`"))
-        } else {
-          Ok(self.run_backtick(contents, token)?)
+        let context = self.context(ConstError::Backtick(*token))?;
+
+        if context.config.dry_run {
+          return Ok(format!("`{contents}`"));
         }
+
+        Self::run_command(context, &self.scope, contents, &[]).map_err(|output_error| {
+          Error::Backtick {
+            token: *token,
+            output_error,
+          }
+        })
       }
       Expression::Call { thunk } => {
         use Thunk::*;
-        let result = match thunk {
-          Nullary { function, .. } => function(function::Context::new(self, thunk.name())),
+        match thunk {
+          Nullary { function, .. } => function(self.function_context(thunk)?),
           Unary { function, arg, .. } => {
             let arg = self.evaluate_expression(arg)?;
-            function(function::Context::new(self, thunk.name()), &arg)
+            function(self.function_context(thunk)?, &arg)
           }
           UnaryOpt {
             function,
@@ -130,7 +298,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
               Some(b) => Some(self.evaluate_expression(b)?),
               None => None,
             };
-            function(function::Context::new(self, thunk.name()), &a, b.as_deref())
+            function(self.function_context(thunk)?, &a, b.as_deref())
           }
           UnaryPlus {
             function,
@@ -142,11 +310,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
             for arg in rest {
               rest_evaluated.push(self.evaluate_expression(arg)?);
             }
-            function(
-              function::Context::new(self, thunk.name()),
-              &a,
-              &rest_evaluated,
-            )
+            function(self.function_context(thunk)?, &a, &rest_evaluated)
           }
           Binary {
             function,
@@ -155,7 +319,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           } => {
             let a = self.evaluate_expression(a)?;
             let b = self.evaluate_expression(b)?;
-            function(function::Context::new(self, thunk.name()), &a, &b)
+            function(self.function_context(thunk)?, &a, &b)
           }
           BinaryPlus {
             function,
@@ -168,12 +332,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
             for arg in rest {
               rest_evaluated.push(self.evaluate_expression(arg)?);
             }
-            function(
-              function::Context::new(self, thunk.name()),
-              &a,
-              &b,
-              &rest_evaluated,
-            )
+            function(self.function_context(thunk)?, &a, &b, &rest_evaluated)
           }
           Ternary {
             function,
@@ -183,10 +342,10 @@ impl<'src, 'run> Evaluator<'src, 'run> {
             let a = self.evaluate_expression(a)?;
             let b = self.evaluate_expression(b)?;
             let c = self.evaluate_expression(c)?;
-            function(function::Context::new(self, thunk.name()), &a, &b, &c)
+            function(self.function_context(thunk)?, &a, &b, &c)
           }
-        };
-        result.map_err(|message| Error::FunctionCall {
+        }
+        .map_err(|message| Error::FunctionCall {
           function: thunk.name(),
           message,
         })
@@ -243,6 +402,8 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         let variable = name.lexeme();
         if let Some(value) = self.scope.value(variable) {
           Ok(value.to_owned())
+        } else if self.non_const_assignments.contains_key(name.lexeme()) {
+          Err(ConstError::Variable(*name).into())
         } else if let Some(assignment) = self
           .assignments
           .and_then(|assignments| assignments.get(variable))
@@ -273,34 +434,26 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     Ok(condition)
   }
 
-  fn run_backtick(&self, raw: &str, token: &Token<'src>) -> RunResult<'src, String> {
-    self
-      .run_command(raw, &[])
-      .map_err(|output_error| Error::Backtick {
-        token: *token,
-        output_error,
-      })
-  }
-
-  pub(crate) fn run_command(&self, command: &str, args: &[&str]) -> Result<String, OutputError> {
-    let mut cmd = self
-      .context
-      .module
-      .settings
-      .shell_command(self.context.config);
+  pub(crate) fn run_command(
+    context: &ExecutionContext,
+    scope: &Scope,
+    command: &str,
+    args: &[&str],
+  ) -> Result<String, OutputError> {
+    let mut cmd = context.module.settings.shell_command(context.config);
 
     cmd
       .arg(command)
       .args(args)
-      .current_dir(self.context.working_directory())
+      .current_dir(context.working_directory())
       .export(
-        &self.context.module.settings,
-        self.context.dotenv,
-        &self.scope,
-        &self.context.module.unexports,
+        &context.module.settings,
+        context.dotenv,
+        scope,
+        &context.module.unexports,
       )
       .stdin(Stdio::inherit())
-      .stderr(if self.context.config.verbosity.quiet() {
+      .stderr(if context.config.verbosity.quiet() {
         Stdio::null()
       } else {
         Stdio::inherit()
@@ -383,10 +536,10 @@ impl<'src, 'run> Evaluator<'src, 'run> {
       }
 
       evaluator.scope.bind(Binding {
-        constant: false,
         export: parameter.export,
         file_depth: 0,
         name: parameter.name,
+        prelude: false,
         private: false,
         value: values.join(" "),
       });
@@ -402,8 +555,9 @@ impl<'src, 'run> Evaluator<'src, 'run> {
   ) -> Self {
     Self {
       assignments: None,
-      context: *context,
+      context: Some(*context),
       is_dependency,
+      non_const_assignments: Table::new(),
       scope: scope.child(),
     }
   }
