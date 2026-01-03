@@ -71,7 +71,6 @@ impl Compiler {
             relative,
             absolute,
             optional,
-            path,
           } => {
             let import = current
               .path
@@ -88,9 +87,11 @@ impl Compiler {
                 });
               }
               *absolute = Some(import.clone());
-              stack.push(current.import(import, path.offset));
+              stack.push(current.import(import, relative.token.offset));
             } else if !*optional {
-              return Err(Error::MissingImportFile { path: *path });
+              return Err(Error::MissingImportFile {
+                path: relative.token,
+              });
             }
           }
           _ => {}
@@ -100,7 +101,7 @@ impl Compiler {
       asts.insert(current.path, ast.clone());
     }
 
-    let justfile = Analyzer::analyze(&asts, config, None, &[], &loaded, None, &paths, root)?;
+    let justfile = Analyzer::analyze(&asts, config, None, &[], &loaded, None, &paths, false, root)?;
 
     Ok(Compilation {
       asts,
@@ -233,6 +234,7 @@ impl Compiler {
       &[],
       None,
       &paths,
+      false,
       &root,
     )
   }
