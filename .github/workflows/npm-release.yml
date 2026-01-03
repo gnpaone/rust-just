@@ -16,12 +16,15 @@ jobs:
     outputs:
       tag: ${{ steps.get-tag.outputs.tag }}
     steps:
-      - name: Find latest tag
+      # - name: Find latest tag
+      #   id: get-tag
+      #   uses: oprypin/find-latest-tag@v1
+      #   with:
+      #     repository: gnpaone/rust-just
+      #     releases-only: true
+      - name: Temporary set tag manually
         id: get-tag
-        uses: oprypin/find-latest-tag@v1
-        with:
-          repository: gnpaone/rust-just
-          releases-only: true
+        run: echo "tag=1.45.0" >> $GITHUB_OUTPUT
 
   publish-binaries:
     name: Publish binaries
