@@ -5,6 +5,10 @@ on:
   repository_dispatch:
     types: [platform-release]
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   find-latest-tag:
     name: Find Latest Tag
@@ -17,43 +21,39 @@ jobs:
         uses: oprypin/find-latest-tag@v1
         with:
           repository: gnpaone/rust-just
-          releases-only: true 
+          releases-only: true
 
   publish-binaries:
     name: Publish binaries
     needs: find-latest-tag
     runs-on: ${{ matrix.OS }}
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
         include:
           - NAME: linux-x64-musl
             OS: ubuntu-22.04
-            TOOLCHAIN: stable
             TARGET: x86_64-unknown-linux-musl
           - NAME: linux-arm64-musl
             OS: ubuntu-22.04
-            TOOLCHAIN: stable
             TARGET: aarch64-unknown-linux-musl
           - NAME: linux-arm-musleabihf
             OS: ubuntu-22.04
-            TOOLCHAIN: stable
             TARGET: arm-unknown-linux-musleabihf
           - NAME: win32-x64-msvc
             OS: windows-2022
-            TOOLCHAIN: stable
             TARGET: x86_64-pc-windows-msvc
           - NAME: win32-arm64-msvc
             OS: windows-2022
-            TOOLCHAIN: stable
             TARGET: aarch64-pc-windows-msvc
           - NAME: darwin-x64
             OS: macos-14
-            TOOLCHAIN: stable
             TARGET: x86_64-apple-darwin
           - NAME: darwin-arm64
             OS: macos-14
-            TOOLCHAIN: stable
             TARGET: aarch64-apple-darwin
     steps:
       - name: Checkout repository
@@ -73,7 +73,7 @@ jobs:
           else
             tar -xzf ./release/just-${{ needs.find-latest-tag.outputs.tag }}-${{ matrix.TARGET }}.tar.gz -C ./target/${{ matrix.TARGET }}/release/
           fi
-      - name: Install node
+      - name: Install Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -101,18 +101,19 @@ jobs:
           cp "../target/${{ matrix.TARGET }}/release/${bin}" "${node_pkg}/bin"
           cp ./README.md "${node_pkg}"
           cd "${node_pkg}"
-          npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish --access public
 
   publish-base:
-    name: Publish the base package to NPM
+    name: Publish base package
     needs: [find-latest-tag, publish-binaries]
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Install node
+      - name: Install Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -136,7 +137,7 @@ jobs:
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "update version & modify lockfile"
+          commit-message: "chore: bump npm package version"
           committer: gnpaone <78990165+gnpaone@users.noreply.github.com>
           author: gnpaone <78990165+gnpaone@users.noreply.github.com>
           branch: npm-update
@@ -147,7 +148,7 @@ jobs:
           delete-branch: true
           title: Bump npm package version
           labels: ":mag_right: bump"
-      - name: Enable pull request automerge
+      - name: Enable PR automerge
         if: steps.cpr.outputs.pull-request-operation == 'created'
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
@@ -168,15 +169,7 @@ jobs:
         shell: bash
         working-directory: npm/rust-just
         run: |
-          yarn config set npmAuthToken ${NODE_AUTH_TOKEN}
-          yarn config set npmPublishRegistry "https://registry.npmjs.org"
           yarn build
           cp ../README.md .
           cp ../../CHANGELOG.md .
-          if [ ${{ contains(github.ref, '-') }} = "true" ]; then
-            yarn npm publish --tag rc
-          else
-            yarn npm publish
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          yarn npm publish --access public
