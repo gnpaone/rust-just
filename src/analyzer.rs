@@ -16,13 +16,16 @@ impl<'run, 'src> Analyzer<'run, 'src> {
     asts: &'run HashMap<PathBuf, Ast<'src>>,
     config: &Config,
     doc: Option<String>,
-    groups: &[StringLiteral],
+    groups: &[StringLiteral<'src>],
     loaded: &[PathBuf],
     name: Option<Name<'src>>,
     paths: &HashMap<PathBuf, PathBuf>,
+    private: bool,
     root: &Path,
   ) -> RunResult<'src, Justfile<'src>> {
-    Self::default().justfile(asts, config, doc, groups, loaded, name, paths, root)
+    Self::default().justfile(
+      asts, config, doc, groups, loaded, name, paths, root, private,
+    )
   }
 
   fn justfile(
@@ -30,11 +33,12 @@ impl<'run, 'src> Analyzer<'run, 'src> {
     asts: &'run HashMap<PathBuf, Ast<'src>>,
     config: &Config,
     doc: Option<String>,
-    groups: &[StringLiteral],
+    groups: &[StringLiteral<'src>],
     loaded: &[PathBuf],
     name: Option<Name<'src>>,
     paths: &HashMap<PathBuf, PathBuf>,
     root: &Path,
+    private: bool,
   ) -> RunResult<'src, Justfile<'src>> {
     let mut definitions = HashMap::new();
     let mut imports = HashSet::new();
@@ -69,6 +73,7 @@ impl<'run, 'src> Analyzer<'run, 'src> {
             doc,
             groups,
             name,
+            private,
             ..
           } => {
             if let Some(absolute) = absolute {
@@ -81,6 +86,7 @@ impl<'run, 'src> Analyzer<'run, 'src> {
                 loaded,
                 Some(*name),
                 paths,
+                *private,
                 absolute,
               )?);
             }
@@ -231,6 +237,7 @@ impl<'run, 'src> Analyzer<'run, 'src> {
       module_path: ast.module_path.clone(),
       modules: self.modules,
       name,
+      private,
       recipes,
       settings,
       source,
