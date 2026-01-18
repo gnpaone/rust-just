@@ -39,8 +39,10 @@ fn flag() {
 
 /// Test that we can use `set shell` to use cmd.exe on windows
 #[test]
-#[cfg(windows)]
 fn cmd() {
+  if cfg!(not(windows)) {
+    return;
+  }
   let tmp = temptree! {
     justfile: r#"
 
@@ -66,8 +68,10 @@ recipe:
 
 /// Test that we can use `set shell` to use cmd.exe on windows
 #[test]
-#[cfg(windows)]
 fn powershell() {
+  if cfg!(not(windows)) {
+    return;
+  }
   let tmp = temptree! {
       justfile: r#"
 
@@ -106,7 +110,7 @@ fn shell_args() {
     .shell(false)
     .stdout("AA\n")
     .stderr("echo A${foo}A\n")
-    .run();
+    .success();
 }
 
 #[test]
@@ -125,7 +129,7 @@ fn shell_override() {
     .shell(false)
     .stdout("hello\n")
     .stderr("echo hello\n")
-    .run();
+    .success();
 }
 
 #[test]
@@ -144,7 +148,7 @@ fn shell_arg_override() {
     .stdout("hello\n")
     .stderr("echo hello\n")
     .shell(false)
-    .run();
+    .success();
 }
 
 #[test]
@@ -164,7 +168,7 @@ fn set_shell() {
     .stdout("echo barecho foo")
     .stderr("echo bar\necho foo\n")
     .shell(false)
-    .run();
+    .success();
 }
 
 #[test]
@@ -181,8 +185,7 @@ fn recipe_shell_not_found_error_message() {
     .stderr_regex(
       "error: Recipe `foo` could not be run because just could not find the shell: .*\n",
     )
-    .status(1)
-    .run();
+    .failure();
 }
 
 #[test]
@@ -199,6 +202,5 @@ fn backtick_recipe_shell_not_found_error_message() {
     .shell(false)
     .args(["--shell", "NOT_A_REAL_SHELL"])
     .stderr_regex("(?s)error: Backtick could not be run because just could not find the shell:.*")
-    .status(1)
-    .run();
+    .failure();
 }
