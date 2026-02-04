@@ -308,7 +308,7 @@ impl<'src> Justfile<'src> {
 
     let scope = outer.child();
 
-    let mut evaluator = Evaluator::new(&context, true, &scope);
+    let mut evaluator = Evaluator::new(&context, BTreeMap::new(), true, &scope);
 
     Self::run_dependencies(
       config,
