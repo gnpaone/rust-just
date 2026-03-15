@@ -3,13 +3,13 @@ use {
     assert_stdout::assert_stdout,
     assert_success::assert_success,
     tempdir::tempdir,
-    test::{assert_eval_eq, Output, Test},
+    test::{Output, Test, assert_eval_eq},
   },
-  just::{unindent, Response},
+  just::{Response, unindent},
   pretty_assertions::Comparison,
   regex::Regex,
   serde::{Deserialize, Serialize},
-  serde_json::{json, Value},
+  serde_json::{Value, json},
   std::{
     collections::BTreeMap,
     env::{self, consts::EXE_SUFFIX},
@@ -18,13 +18,13 @@ use {
     fs,
     io::Write,
     iter,
-    path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR},
+    path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR, Path, PathBuf},
     process::{Command, Stdio},
     str,
     time::{Duration, Instant},
   },
   tempfile::TempDir,
-  temptree::{temptree, tree, Tree},
+  temptree::{Tree, temptree, tree},
   which::which,
 };
 
@@ -88,6 +88,7 @@ mod init;
 mod interpolation;
 mod invocation_directory;
 mod json;
+mod lazy;
 mod line_prefixes;
 mod list;
 mod logical_operators;
@@ -102,6 +103,7 @@ mod no_dependencies;
 mod no_exit_message;
 mod options;
 mod os_attributes;
+mod overrides;
 mod parallel;
 mod parameters;
 mod parser;
