@@ -582,7 +582,7 @@ out of the box, thanks to [tomodachi94](https://github.com/tomodachi94).
 ### Zed
 
 The [zed-just](https://github.com/jackTabsCode/zed-just/) extension by
-[jackTabsCode](https://github.com/jackTabsCode) is avilable on the
+[jackTabsCode](https://github.com/jackTabsCode) is available on the
 [Zed extensions page](https://zed.dev/extensions?query=just).
 
 ### Other Editors
@@ -1956,9 +1956,9 @@ The process ID is: 420
 - `quote(s)` - Replace all single quotes with `'\''` and prepend and append
   single quotes to `s`. This is sufficient to escape special characters for
   many shells, including most Bourne shell descendants.
-- `replace(s, from, to)` - Replace all occurrences of `from` in `s` to `to`.
+- `replace(s, from, to)` - Replace all occurrences of `from` in `s` with `to`.
 - `replace_regex(s, regex, replacement)` - Replace all occurrences of `regex`
-  in `s` to `replacement`. Regular expressions are provided by the
+  in `s` with `replacement`. Regular expressions are provided by the
   [Rust `regex` crate](https://docs.rs/regex/latest/regex/). See the
   [syntax documentation](https://docs.rs/regex/latest/regex/#syntax) for usage
   examples. Capture groups are supported. The `replacement` string uses
@@ -2322,6 +2322,18 @@ The default confirmation prompt can be overridden with `[confirm(PROMPT)]`:
 delete-everything:
   rm -rf *
 ```
+
+#### Metadata
+
+Metadata in the form of lists of strings may be attached to recipes with the
+`[metadata(METADATA)]` attribute<sup>1.42.0</sup>:
+
+```just
+[metadata("hello", "goodbye")]
+foo:
+```
+
+Metadata can be read using `just --dump --dump-format json`.
 
 ### Groups
 
