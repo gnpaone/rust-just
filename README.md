@@ -2577,6 +2577,10 @@ $ just --set os bsd
 ./test --test bsd
 ```
 
+Variables in submodules can be overridden using the `::`-separated path to the
+variable. A variable named `bar` in a submodule named `foo` may be overridden
+with `foo::bar=VALUE` or `--set foo::bar VALUE`.
+
 ### Getting and Setting Environment Variables
 
 #### Exporting `just` Variables
@@ -2942,7 +2946,7 @@ bar=hello
 
 If a parameter has both a long and short option, it may be passed using either.
 
-Variadic `+` and `?` parameters cannot be options.
+Variadic `*` and `+` parameters cannot be options.
 
 The `[arg(ARG, value=VALUE, …)]`<sup>1.46.0</sup> attribute can be used with
 `long` or `short` to make a parameter a flag which does not take a value.
@@ -4324,7 +4328,7 @@ for details.
 
 ### Signal Handling
 
-[Signals](https://en.wikipedia.org/wiki/Signal_(IPC)) are messsages sent to
+[Signals](https://en.wikipedia.org/wiki/Signal_(IPC)) are messages sent to
 running programs to trigger specific behavior. For example, `SIGINT` is sent to
 all processes in the terminal forground process group when `CTRL-C` is pressed.
 
