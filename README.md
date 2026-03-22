@@ -161,6 +161,11 @@ most Windows users.)
       <td><code>cargo install just</code></td>
     </tr>
     <tr>
+      <td><a href=https://github.com/cargo-bins/cargo-binstall>Cargo Binstall</a></td>
+      <td><a href=https://crates.io/crates/just>just</a></td>
+      <td><code>cargo binstall just</code></td>
+    </tr>
+    <tr>
       <td><a href=https://docs.conda.io/projects/conda/en/latest/index.html>Conda</a></td>
       <td><a href=https://anaconda.org/conda-forge/just>just</a></td>
       <td><code>conda install -c conda-forge just</code></td>
@@ -1240,7 +1245,7 @@ $ just test foo "bar baz"
 - bar baz
 ```
 
-Positional arguments may also be turned on on a per-recipe basis with the
+Positional arguments may also be turned on a per-recipe basis with the
 `[positional-arguments]` attribute<sup>1.29.0</sup>:
 
 ```just
@@ -4334,7 +4339,7 @@ for details.
 
 [Signals](https://en.wikipedia.org/wiki/Signal_(IPC)) are messages sent to
 running programs to trigger specific behavior. For example, `SIGINT` is sent to
-all processes in the terminal forground process group when `CTRL-C` is pressed.
+all processes in the terminal foreground process group when `CTRL-C` is pressed.
 
 `just` tries to exit when requested by a signal, but it also tries to avoid
 leaving behind running child proccesses, two goals which are somewhat in
@@ -4772,7 +4777,7 @@ and checking the program's stdout, stderr, and exit code .
 
 4. Add a failing test for your feature. Most of the time this will be an
    integration test which exercises the feature end-to-end. Look for an
-   appropriate file to put the test in in
+   appropriate file to put the test in
    [tests](https://github.com/casey/just/blob/master/tests), or add a new file
    in [tests](https://github.com/casey/just/blob/master/tests) and add a `mod`
    statement importing that file in
