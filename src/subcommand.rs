@@ -16,14 +16,14 @@ const CHOOSER_CANCELLED_EXIT_STATUS: i32 = 130;
 pub(crate) enum Subcommand {
   Changelog,
   Choose {
-    chooser: Option<String>,
+    chooser: Option<PathBuf>,
   },
   Command {
     arguments: Vec<OsString>,
     binary: OsString,
   },
   Completions {
-    shell: completions::Shell,
+    shell: Shell,
   },
   Dump {
     format: DumpFormat,
@@ -82,11 +82,7 @@ impl Subcommand {
       _ => {}
     }
 
-    let search = Search::find(
-      config.ceiling.as_deref(),
-      &config.invocation_directory,
-      &config.search_config,
-    )?;
+    let search = Search::search(config)?;
 
     if matches!(self, Edit) {
       return Self::edit(&search);
@@ -220,7 +216,7 @@ impl Subcommand {
   }
 
   fn choose<'src>(
-    chooser: Option<&str>,
+    chooser: Option<&Path>,
     config: &Config,
     justfile: &Justfile<'src>,
     overrides: &HashMap<Number, String>,
@@ -311,8 +307,8 @@ impl Subcommand {
     justfile.run(config, search, &recipes, overrides)
   }
 
-  fn completions(shell: completions::Shell) {
-    print!("{}", shell.script());
+  fn completions(shell: Shell) {
+    print!("{}", shell.completion_script());
   }
 
   fn dump(compilation: Compilation, format: DumpFormat) -> RunResult<'static> {
@@ -798,40 +794,18 @@ impl Subcommand {
   }
 
   fn summary(config: &Config, justfile: &Justfile) {
-    let mut printed = 0;
-    Self::summary_recursive(config, &mut Vec::new(), &mut printed, justfile);
-    println!();
+    let recipes = justfile.public_recipes_recursive(config);
 
-    if printed == 0 && config.verbosity.loud() {
-      eprintln!("Justfile contains no recipes.");
-    }
-  }
-
-  fn summary_recursive<'a>(
-    config: &Config,
-    components: &mut Vec<&'a str>,
-    printed: &mut usize,
-    justfile: &'a Justfile,
-  ) {
-    let path = components.join("::");
-
-    for recipe in justfile.public_recipes(config) {
-      if *printed > 0 {
+    for (i, recipe) in recipes.iter().enumerate() {
+      if i > 0 {
         print!(" ");
       }
-      if path.is_empty() {
-        print!("{}", recipe.name());
-      } else {
-        print!("{}::{}", path, recipe.name());
-      }
-      *printed += 1;
+      print!("{}", recipe.recipe_path());
     }
+    println!();
 
-    for module in justfile.public_modules(config) {
-      let name = module.name();
-      components.push(name);
-      Self::summary_recursive(config, components, printed, module);
-      components.pop();
+    if recipes.is_empty() && config.verbosity.loud() {
+      eprintln!("Justfile contains no recipes.");
     }
   }
 

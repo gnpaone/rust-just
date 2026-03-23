@@ -4342,7 +4342,7 @@ running programs to trigger specific behavior. For example, `SIGINT` is sent to
 all processes in the terminal foreground process group when `CTRL-C` is pressed.
 
 `just` tries to exit when requested by a signal, but it also tries to avoid
-leaving behind running child proccesses, two goals which are somewhat in
+leaving behind running child processes, two goals which are somewhat in
 conflict.
 
 If `just` exits leaving behind child processes, the user will have no recourse
@@ -4460,7 +4460,7 @@ complete -F _just -o bashdefault -o default j
 ### Shell Completion Scripts
 
 Shell completion scripts for Bash, Elvish, Fish, Nushell, PowerShell, and Zsh
-are available [release archives](https://github.com/casey/just/releases).
+are available in [release archives](https://github.com/casey/just/releases).
 
 The `just` binary can also generate the same completion scripts at runtime
 using `just --completions SHELL`:

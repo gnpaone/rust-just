@@ -26,7 +26,7 @@ use {
   trailing_var_arg = true,
   version = env!("CARGO_PKG_VERSION"),
 )]
-pub(crate) struct Arguments {
+pub struct Arguments {
   #[arg(
     conflicts_with = "no_aliases",
     default_value = "right",
@@ -44,11 +44,13 @@ pub(crate) struct Arguments {
   pub(crate) allow_missing: bool,
   #[arg(
     action = ArgAction::Append,
+    add = ArgValueCompleter::new(Completer::complete_argument),
     help = "Overrides and recipe(s) to run, defaulting to the first recipe in the justfile",
     num_args = 1..,
   )]
   pub(crate) arguments: Vec<String>,
   #[arg(
+    add = ArgValueCompleter::new(PathCompleter::dir()),
     env = "JUST_CEILING",
     help = "Do not ascend above <CEILING> directory when searching for a justfile.",
     long,
@@ -63,11 +65,12 @@ pub(crate) struct Arguments {
   )]
   pub(crate) check: bool,
   #[arg(
+    add = ArgValueCompleter::new(PathCompleter::file()),
     env = "JUST_CHOOSER",
     help = "Override binary invoked by `--choose`",
     long
   )]
-  pub(crate) chooser: Option<String>,
+  pub(crate) chooser: Option<PathBuf>,
   #[arg(help = "Clear shell arguments", long, overrides_with = "shell_arg")]
   pub(crate) clear_shell_args: bool,
   #[arg(
@@ -86,6 +89,7 @@ pub(crate) struct Arguments {
   )]
   pub(crate) command_color: Option<CommandColor>,
   #[arg(
+    add = ArgValueCompleter::new(PathCompleter::file()),
     default_value = "cygpath",
     env = "JUST_CYGPATH",
     help = "Use binary at <CYGPATH> to convert between unix and Windows paths.",
@@ -101,6 +105,7 @@ pub(crate) struct Arguments {
   )]
   pub(crate) dotenv_filename: Option<String>,
   #[arg(
+    add = ArgValueCompleter::new(PathCompleter::file()),
     help = "Load <DOTENV-PATH> as environment file instead of searching for one",
     long,
     short = 'E',
@@ -139,6 +144,7 @@ pub(crate) struct Arguments {
   )]
   pub(crate) global_justfile: bool,
   #[arg(
+    add = ArgValueCompleter::new(Completer::complete_group),
     env = "JUST_GROUP",
     help = "Only list recipes in <GROUP>",
     long = "group",
@@ -153,6 +159,7 @@ pub(crate) struct Arguments {
   )]
   pub(crate) highlight: bool,
   #[arg(
+    add = ArgValueCompleter::new(PathCompleter::file()),
     env = "JUST_JUSTFILE",
     help = "Use <JUSTFILE> as justfile",
     long,
@@ -217,6 +224,7 @@ pub(crate) struct Arguments {
   pub(crate) quiet: bool,
   #[arg(
     action = ArgAction::Append,
+    add = ArgValueCompleter::new(Completer::complete_variable),
     help = "Override <VARIABLE> with <VALUE>",
     long,
     num_args = 2,
@@ -241,6 +249,7 @@ pub(crate) struct Arguments {
   #[command(flatten)]
   pub(crate) subcommand: Subcommand,
   #[arg(
+    add = ArgValueCompleter::new(PathCompleter::dir()),
     env = "JUST_TEMPDIR",
     help = "Save temporary files to <TEMPDIR>.",
     long,
@@ -280,6 +289,7 @@ pub(crate) struct Arguments {
   )]
   pub(crate) verbose: u8,
   #[arg(
+    add = ArgValueCompleter::new(PathCompleter::dir()),
     env = "JUST_WORKING_DIRECTORY",
     help = "Use <WORKING-DIRECTORY> as working directory. --justfile must also be set",
     long,
@@ -328,7 +338,7 @@ pub(crate) struct Subcommand {
     value_enum,
     value_name = "SHELL",
   )]
-  pub(crate) completions: Option<completions::Shell>,
+  pub(crate) completions: Option<Shell>,
   #[arg(
     help = "Print justfile",
     help_heading = Self::HEADING,
@@ -402,6 +412,7 @@ pub(crate) struct Subcommand {
   )]
   pub(crate) request: Option<String>,
   #[arg(
+    add = ArgValueCompleter::new(Completer::complete_recipe),
     conflicts_with = "arguments",
     help = "Show recipe at <PATH>",
     help_heading = Self::HEADING,
@@ -418,6 +429,7 @@ pub(crate) struct Subcommand {
   )]
   pub(crate) summary: bool,
   #[arg(
+    add = ArgValueCompleter::new(Completer::complete_recipe),
     conflicts_with = "arguments",
     help = "Print recipe usage information",
     help_heading = Self::HEADING,
