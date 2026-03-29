@@ -1,19 +1,11 @@
 #!/usr/bin/env node
 
 import { execa } from "execa";
+import type { Options as ExecaOptions } from "execa";
 import { fileURLToPath } from "node:url";
 import { getExePath } from "./getExePath.js";
 import yargs from "yargs/yargs";
 import { hideBin } from "yargs/helpers";
-
-function safeParse(jsonString) {
-  try {
-    return JSON.parse(jsonString);
-  } catch (e) {
-    console.error("Invalid JSON format in --options");
-    process.exit(1);
-  }
-}
 
 async function run() {
   const exePath = await getExePath();
@@ -23,24 +15,30 @@ async function run() {
       type: 'string',
       description: 'Execa options in JSON format',
     })
+    .coerce('execaoptions', (arg: string) => {
+      try {
+        return JSON.parse(arg) as ExecaOptions;
+      } catch (e) {
+        throw new Error("Invalid JSON format in --execaoptions");
+      }
+    })
     .parserConfiguration({
       'unknown-options-as-args': true,
     })
     .help(false)
     .version(false)
-    .parse();
+    .parseSync() as {
+      _: (string | number)[];
+      execaoptions?: string;
+    };
 
   const args = argv._;
 
-  let execaOptions = {
+  const execaOptions: ExecaOptions = {
     stdio: "inherit",
     reject: false,
+    ...(argv.execaoptions || {}),
   };
-
-  if (argv.execaoptions) {
-    const userOptions = safeParse(argv.execaoptions);
-    execaOptions = { ...execaOptions, ...userOptions };
-  }
   
   const processResult = await execa(fileURLToPath(exePath), args, execaOptions);
 
