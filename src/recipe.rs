@@ -207,7 +207,10 @@ impl<'src> Recipe<'src> {
     let suffix = color.suffix();
 
     if context.config.verbosity.loquacious() {
-      eprintln!("{prefix}===> Running recipe `{}`...{suffix}", self.name);
+      eprintln!(
+        "{prefix}===> Running recipe `{}`...{suffix}",
+        self.recipe_path(),
+      );
     }
 
     if context.config.explain {
@@ -612,7 +615,7 @@ impl<D: Display> ColorDisplay for Recipe<'_, D> {
       }
       for (j, fragment) in line.fragments.iter().enumerate() {
         if j == 0 {
-          write!(f, "    ")?;
+          write!(f, "{}", color.indentation())?;
         }
         match fragment {
           Fragment::Text { token } => write!(f, "{}", token.lexeme())?,

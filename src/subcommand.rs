@@ -30,7 +30,7 @@ pub(crate) enum Subcommand {
   },
   Edit,
   Evaluate {
-    variable: Option<String>,
+    path: Modulepath,
   },
   Format,
   Groups,
@@ -108,7 +108,7 @@ impl Subcommand {
       Command { .. } | Evaluate { .. } => {
         justfile.run(config, &search, &[], &compilation.overrides)?;
       }
-      Dump { format } => Self::dump(compilation, *format)?,
+      Dump { format } => Self::dump(config, compilation, *format)?,
       Groups => Self::groups(config, justfile),
       List { path } => Self::list(config, justfile, path)?,
       Run { arguments } => Self::run(config, loader, search, compilation, arguments)?,
@@ -311,14 +311,19 @@ impl Subcommand {
     print!("{}", shell.completion_script());
   }
 
-  fn dump(compilation: Compilation, format: DumpFormat) -> RunResult<'static> {
+  fn dump(config: &Config, compilation: Compilation, format: DumpFormat) -> RunResult<'static> {
     match format {
       DumpFormat::Json => {
         serde_json::to_writer(io::stdout(), &compilation.justfile)
           .map_err(|source| Error::DumpJson { source })?;
         println!();
       }
-      DumpFormat::Just => print!("{}", compilation.root_ast()),
+      DumpFormat::Just => print!(
+        "{}",
+        compilation
+          .root_ast()
+          .color_display(config.color.use_color(UseColor::Never))
+      ),
     }
     Ok(())
   }
@@ -374,7 +379,9 @@ impl Subcommand {
       });
     }
 
-    let formatted = ast.to_string();
+    let formatted = ast
+      .color_display(config.color.use_color(UseColor::Never))
+      .to_string();
 
     if formatted == src {
       return Ok(());
@@ -484,7 +491,7 @@ impl Subcommand {
   }
 
   fn list(config: &Config, mut module: &Justfile, path: &Modulepath) -> RunResult<'static> {
-    for name in &path.path {
+    for name in &path.components {
       module = module
         .modules
         .get(name)
@@ -856,7 +863,7 @@ impl Subcommand {
     mut module: &'run Justfile<'src>,
     path: &Modulepath,
   ) -> RunResult<'src, (Option<&'run Alias<'src>>, &'run Recipe<'src>)> {
-    for name in &path.path[0..path.path.len() - 1] {
+    for name in &path.components[0..path.components.len() - 1] {
       module = module
         .modules
         .get(name)
@@ -865,7 +872,7 @@ impl Subcommand {
         })?;
     }
 
-    let name = path.path.last().unwrap();
+    let name = path.components.last().unwrap();
 
     if let Some(alias) = module.get_alias(name) {
       Ok((Some(alias), &alias.target))
