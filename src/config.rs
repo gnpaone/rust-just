@@ -99,7 +99,7 @@ impl Config {
     let mut path = Modulepath::try_from([path].as_slice())
       .map_err(|()| ConfigError::OverridePath { path: path.into() })?;
 
-    let name = path.path.pop().unwrap();
+    let name = path.components.pop().unwrap();
 
     Ok((path, name))
   }
@@ -125,16 +125,18 @@ impl Config {
     } else if arguments.subcommand.edit {
       Ok(Subcommand::Edit)
     } else if arguments.subcommand.evaluate {
-      if positional.arguments.len() > 1 {
+      let path = if positional.arguments.is_empty() {
+        Modulepath::default()
+      } else if positional.arguments.len() == 1 {
+        Self::parse_modulepath(&positional.arguments)?
+      } else {
         return Err(ConfigError::SubcommandArguments {
           subcommand: "EVALUATE",
           arguments: positional.arguments.iter().skip(1).cloned().collect(),
         });
-      }
+      };
 
-      Ok(Subcommand::Evaluate {
-        variable: positional.arguments.first().cloned(),
-      })
+      Ok(Subcommand::Evaluate { path })
     } else if arguments.subcommand.fmt {
       Ok(Subcommand::Format)
     } else if arguments.subcommand.groups {
@@ -244,7 +246,7 @@ impl Config {
       allow_missing: arguments.allow_missing,
       ceiling: arguments.ceiling,
       check: arguments.check,
-      color: arguments.color.into(),
+      color: Color::new(arguments.indentation, arguments.color),
       command_color: arguments.command_color.map(CommandColor::into),
       cygpath: arguments.cygpath,
       dotenv_filename: arguments.dotenv_filename,
@@ -785,7 +787,7 @@ mod tests {
     args: ["--evaluate"],
     overrides: map!{},
     subcommand: Subcommand::Evaluate {
-      variable: None,
+      path: Modulepath::default(),
     },
   }
 
@@ -794,7 +796,7 @@ mod tests {
     args: ["--evaluate", "x=y"],
     overrides: map!{"x": "y"},
     subcommand: Subcommand::Evaluate {
-      variable: None,
+      path: Modulepath::default(),
     },
   }
 
@@ -803,48 +805,45 @@ mod tests {
     args: ["--evaluate", "x=y", "foo"],
     overrides: map!{"x": "y"},
     subcommand: Subcommand::Evaluate {
-      variable: Some("foo".to_owned()),
+      path: Modulepath::try_from(["foo"].as_slice()).unwrap(),
     },
   }
 
   test! {
     name: subcommand_list_long,
     args: ["--list"],
-    subcommand: Subcommand::List{ path: Modulepath { path: Vec::new(), spaced: false } },
+    subcommand: Subcommand::List { path: Modulepath::default() },
   }
 
   test! {
     name: subcommand_list_short,
     args: ["-l"],
-    subcommand: Subcommand::List{ path: Modulepath { path: Vec::new(), spaced: false } },
+    subcommand: Subcommand::List { path: Modulepath::default() },
   }
 
   test! {
     name: subcommand_list_arguments,
     args: ["--list", "bar"],
-    subcommand: Subcommand::List{ path: Modulepath { path: vec!["bar".into()], spaced: false } },
+    subcommand: Subcommand::List { path: Modulepath::try_from(["bar"].as_slice()).unwrap() },
   }
 
   test! {
     name: subcommand_show_long,
     args: ["--show", "build"],
-    subcommand: Subcommand::Show { path: Modulepath { path: vec!["build".into()], spaced: false } },
+    subcommand: Subcommand::Show { path: Modulepath::try_from(["build"].as_slice()).unwrap() },
   }
 
   test! {
     name: subcommand_show_short,
     args: ["-s", "build"],
-    subcommand: Subcommand::Show { path: Modulepath { path: vec!["build".into()], spaced: false } },
+    subcommand: Subcommand::Show { path: Modulepath::try_from(["build"].as_slice()).unwrap() },
   }
 
   test! {
     name: subcommand_show_multiple_args,
     args: ["--show", "foo", "bar"],
     subcommand: Subcommand::Show {
-      path: Modulepath {
-        path: vec!["foo".into(), "bar".into()],
-        spaced: true,
-      },
+      path: Modulepath::try_from(["foo", "bar"].as_slice()).unwrap(),
     },
   }
 
