@@ -1,12 +1,12 @@
 [package]
 name = "just"
-version = "1.48.1"
+version = "1.49.0"
 authors = ["Casey Rodarmor <casey@rodarmor.com>"]
 autotests = false
 categories = ["command-line-utilities", "development-tools"]
 description = "🤖 Just a command runner"
 edition = "2024"
-exclude = ["/book", "/etc", "/www"]
+exclude = ["/book", "/etc", "!/etc/completion-registration-script.bash", "/www"]
 homepage = "https://github.com/casey/just"
 keywords = ["command-line", "task", "runner", "development", "utility"]
 license = "CC0-1.0"
@@ -25,7 +25,6 @@ chrono = "0.4.38"
 clap = { version = "4.0.0", features = ["derive", "env", "wrap_help"] }
 clap_complete = { version = "=4.6.0", features = ["unstable-dynamic"] }
 clap_mangen = "0.3.0"
-derive-where = "1.2.7"
 dirs = "6.0.0"
 dotenvy = "0.15.0"
 edit-distance = "2.0.0"
@@ -43,7 +42,7 @@ serde = { version = "1.0.130", features = ["derive", "rc"] }
 serde_json = "1.0.68"
 sha2 = "0.10.9"
 shellexpand = "3.1.0"
-similar = { version = "2.1.0", features = ["unicode"] }
+similar = { version = "3.0.0", features = ["unicode"] }
 snafu = "0.9.0"
 strum = { version = "0.28.0", features = ["derive"] }
 target = "2.0.0"
