@@ -155,6 +155,36 @@ impl<'run, 'src> Parser<'run, 'src> {
     true
   }
 
+  /// Check if the next significant tokens are of kinds `kinds`, followed by a
+  /// comment, end-of-file, or end-of-line.
+  ///
+  /// The first token in `kinds` will be added to the expected token set.
+  fn line_is(&mut self, kinds: &[TokenKind]) -> bool {
+    if let Some(&kind) = kinds.first() {
+      self.expected_tokens.insert(kind);
+    }
+
+    let mut rest = self.rest();
+    for kind in kinds {
+      match rest.next() {
+        Some(token) => {
+          if token.kind != *kind {
+            return false;
+          }
+        }
+        None => return false,
+      }
+    }
+
+    if let Some(token) = rest.next() {
+      if matches!(token.kind, Comment | Eof | Eol) {
+        return true;
+      }
+    }
+
+    false
+  }
+
   /// Advance past one significant token, clearing the expected token set.
   fn advance(&mut self) -> CompileResult<'src, Token<'src>> {
     self.expected_tokens.clear();
@@ -361,7 +391,7 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     self.accept(ByteOrderMark)?;
 
-    loop {
+    while !self.accepted(Eof)? {
       let mut attributes = self.parse_attributes()?;
       let mut take_attributes = || {
         attributes
@@ -378,8 +408,6 @@ impl<'run, 'src> Parser<'run, 'src> {
         eol_since_last_comment = false;
       } else if self.accepted(Eol)? {
         eol_since_last_comment = true;
-      } else if self.accepted(Eof)? {
-        break;
       } else if self.next_is(Identifier) {
         match Keyword::from_lexeme(next.lexeme()) {
           Some(Keyword::Alias) if self.next_are(&[Identifier, Identifier, ColonEquals]) => {
@@ -401,19 +429,16 @@ impl<'run, 'src> Parser<'run, 'src> {
               true,
             )?));
           }
-          Some(Keyword::Unexport)
-            if self.next_are(&[Identifier, Identifier, Eof])
-              || self.next_are(&[Identifier, Identifier, Eol]) =>
-          {
+          Some(Keyword::Unexport) if self.line_is(&[Identifier, Identifier]) => {
             self.presume_keyword(Keyword::Unexport)?;
             let name = self.parse_name()?;
             self.expect_eol()?;
             items.push(Item::Unexport { name });
           }
           Some(Keyword::Import)
-            if self.next_are(&[Identifier, StringToken])
-              || self.next_are(&[Identifier, Identifier, StringToken])
-              || self.next_are(&[Identifier, QuestionMark]) =>
+            if self.next_are(&[Identifier, Identifier, StringToken])
+              || self.next_are(&[Identifier, QuestionMark])
+              || self.next_are(&[Identifier, StringToken]) =>
           {
             self.presume_keyword(Keyword::Import)?;
             let optional = self.accepted(QuestionMark)?;
@@ -425,9 +450,7 @@ impl<'run, 'src> Parser<'run, 'src> {
             });
           }
           Some(Keyword::Mod)
-            if self.next_are(&[Identifier, Identifier, Comment])
-              || self.next_are(&[Identifier, Identifier, Eof])
-              || self.next_are(&[Identifier, Identifier, Eol])
+            if self.line_is(&[Identifier, Identifier])
               || self.next_are(&[Identifier, Identifier, Identifier, StringToken])
               || self.next_are(&[Identifier, Identifier, StringToken])
               || self.next_are(&[Identifier, QuestionMark]) =>
@@ -487,15 +510,14 @@ impl<'run, 'src> Parser<'run, 'src> {
           }
           Some(Keyword::Set)
             if self.next_are(&[Identifier, Identifier, ColonEquals])
-              || self.next_are(&[Identifier, Identifier, Comment, Eof])
-              || self.next_are(&[Identifier, Identifier, Comment, Eol])
-              || self.next_are(&[Identifier, Identifier, Eof])
-              || self.next_are(&[Identifier, Identifier, Eol]) =>
+              || self.line_is(&[Identifier, Identifier]) =>
           {
             items.push(Item::Set(self.parse_set()?));
           }
           _ => {
-            if self.next_are(&[Identifier, ColonEquals]) {
+            if self.next_are(&[Identifier, ParenL]) {
+              items.push(Item::Function(self.parse_function_definition()?));
+            } else if self.next_are(&[Identifier, ColonEquals]) {
               items.push(Item::Assignment(self.parse_assignment(
                 take_attributes(),
                 false,
@@ -562,6 +584,38 @@ impl<'run, 'src> Parser<'run, 'src> {
       attributes,
       name,
       target,
+    })
+  }
+
+  fn parse_function_definition(&mut self) -> CompileResult<'src, FunctionDefinition<'src>> {
+    self
+      .unstable_features
+      .insert(UnstableFeature::UserDefinedFunction);
+
+    let name = self.parse_name()?;
+
+    self.presume(ParenL)?;
+
+    let mut parameters = Vec::new();
+    while !self.next_is(ParenR) {
+      parameters.push((self.parse_name()?, self.numerator.next()));
+      if !self.accepted(Comma)? {
+        break;
+      }
+    }
+
+    self.expect(ParenR)?;
+
+    self.expect(ColonEquals)?;
+
+    let body = self.parse_expression()?;
+
+    self.expect_eol()?;
+
+    Ok(FunctionDefinition {
+      body,
+      name,
+      parameters,
     })
   }
 
@@ -819,9 +873,7 @@ impl<'run, 'src> Parser<'run, 'src> {
               .unstable_features
               .insert(UnstableFeature::WhichFunction);
           }
-          Ok(Expression::Call {
-            thunk: Thunk::resolve(name, arguments)?,
-          })
+          Ok(Expression::Call { name, arguments })
         } else {
           Ok(Expression::Variable { name })
         }
@@ -3065,134 +3117,6 @@ mod tests {
     width:  5,
     kind:   UnknownSetting {
       setting: "shall",
-    },
-  }
-
-  error! {
-    name:   unknown_function,
-    input:  "a := foo()",
-    offset: 5,
-    line:   0,
-    column: 5,
-    width:  3,
-    kind:   UnknownFunction{function: "foo"},
-  }
-
-  error! {
-    name:   unknown_function_in_interpolation,
-    input:  "a:\n echo {{bar()}}",
-    offset: 11,
-    line:   1,
-    column: 8,
-    width:  3,
-    kind:   UnknownFunction{function: "bar"},
-  }
-
-  error! {
-    name:   unknown_function_in_default,
-    input:  "a f=baz():",
-    offset: 4,
-    line:   0,
-    column: 4,
-    width:  3,
-    kind:   UnknownFunction{function: "baz"},
-  }
-
-  error! {
-    name: function_argument_count_nullary,
-    input: "x := arch('foo')",
-    offset: 5,
-    line: 0,
-    column: 5,
-    width: 4,
-    kind: FunctionArgumentCountMismatch {
-      function: "arch",
-      found: 1,
-      expected: 0..=0,
-    },
-  }
-
-  error! {
-    name: function_argument_count_unary,
-    input: "x := env_var()",
-    offset: 5,
-    line: 0,
-    column: 5,
-    width: 7,
-    kind: FunctionArgumentCountMismatch {
-      function: "env_var",
-      found: 0,
-      expected: 1..=1,
-    },
-  }
-
-  error! {
-    name: function_argument_count_too_high_unary_opt,
-    input: "x := env('foo', 'foo', 'foo')",
-    offset: 5,
-    line: 0,
-    column: 5,
-    width: 3,
-    kind: FunctionArgumentCountMismatch {
-      function: "env",
-      found: 3,
-      expected: 1..=2,
-    },
-  }
-
-  error! {
-    name: function_argument_count_too_low_unary_opt,
-    input: "x := env()",
-    offset: 5,
-    line: 0,
-    column: 5,
-    width: 3,
-    kind: FunctionArgumentCountMismatch {
-      function: "env",
-      found: 0,
-      expected: 1..=2,
-    },
-  }
-
-  error! {
-    name: function_argument_count_binary,
-    input: "x := env_var_or_default('foo')",
-    offset: 5,
-    line: 0,
-    column: 5,
-    width: 18,
-    kind: FunctionArgumentCountMismatch {
-      function: "env_var_or_default",
-      found: 1,
-      expected: 2..=2,
-    },
-  }
-
-  error! {
-    name: function_argument_count_binary_plus,
-    input: "x := join('foo')",
-    offset: 5,
-    line: 0,
-    column: 5,
-    width: 4,
-    kind: FunctionArgumentCountMismatch {
-      function: "join",
-      found: 1,
-      expected: 2..=usize::MAX,
-    },
-  }
-
-  error! {
-    name: function_argument_count_ternary,
-    input: "x := replace('foo')",
-    offset: 5,
-    line: 0,
-    column: 5,
-    width: 7,
-    kind: FunctionArgumentCountMismatch {
-      function: "replace",
-      found: 1,
-      expected: 3..=3,
     },
   }
 }

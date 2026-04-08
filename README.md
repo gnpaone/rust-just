@@ -1040,6 +1040,7 @@ foo:
 | `export` | boolean | `false` | Export all variables as environment variables. |
 | `fallback` | boolean | `false` | Search `justfile` in parent directory if the first recipe on the command line is not found. |
 | `ignore-comments` | boolean | `false` | Ignore recipe lines beginning with `#`. |
+| `no-exit-message`<sup>1.39.0</sup> | boolean | `false` | Don't print exit messages if recipes fail. |
 | `lazy`<sup>1.47.0</sup> | boolean | `false` | Don't evaluate unused variables. |
 | `positional-arguments` | boolean | `false` | Pass positional arguments. |
 | `quiet` | boolean | `false` | Disable echoing recipe lines before executing. |
@@ -1064,7 +1065,7 @@ set NAME := true
 ```
 
 Non-boolean settings can be set to both strings and
-expressions.<sup>1.46.0</sup>
+expressions<sup>1.46.0</sup>.
 
 However, because settings affect the behavior of backticks and many functions,
 those expressions may not contain backticks or function calls, directly or
@@ -1173,7 +1174,7 @@ Starting server with database localhost:6379 on port 1337…
 Variables in environment files loaded in parent modules are inherited by
 submodules.
 
-Environment files are loaded in submodules<sup>master<sup> and may override
+Environment files are loaded in submodules<sup>1.49.0<sup> and may override
 variable defined in parent module environment files.
 
 #### Export
@@ -1455,7 +1456,7 @@ hello
 ```
 
 All variables in a submodule or a single variable in a submodule may be printed
-with a path to the submodule or variable<sup>master</sup>:
+with a path to the submodule or variable<sup>1.49.0</sup>:
 
 ```console
 $ just --evaluate bob::bar
@@ -1466,7 +1467,7 @@ hello
 ```
 
 The format of exported variables may be controlled with
-`--evaluate-format`<sup>master</sup>:
+`--evaluate-format`<sup>1.49.0</sup>:
 
 ```console
 $ just --evaluate --evaluate-format shell
@@ -1784,7 +1785,7 @@ BAR
 FOO
 ```
 
-### Functions
+### Built-in Functions
 
 `just` provides many built-in functions for use in expressions, including
 recipe body `{{…}}` substitutions, assignments, and default parameter values.
@@ -2224,6 +2225,36 @@ xdg_config_dir := if env('XDG_CONFIG_HOME', '') =~ '^/' {
 }
 ```
 
+### User-defined functions
+
+New functions may be defined<sup>1.49.0</sup>:
+
+```just
+set unstable
+
+hello(name) := f"Hello, {{ name }}!"
+
+foo:
+  echo '{{ hello("World") }}'
+```
+
+User defined functions are currently unstable.
+
+Functions may reference assignments in the same module:
+
+```just
+set unstable
+
+base := "foo"
+
+join(extension) := base + "." + extension
+
+create:
+  touch {{ join("c") }}
+  touch {{ join("html") }}
+  touch {{ join("txt") }}
+```
+
 ### Constants
 
 A number of constants are predefined:
@@ -2308,6 +2339,7 @@ change their behavior.
 | `[dragonfly]`<sup>1.47.0</sup> | recipe | Enable recipe on DragonFly BSD. |
 | `[env(ENV_VAR, VALUE)]` <sup>1.47.0</sup> | recipe | Set environment variables for recipe. |
 | `[extension(EXT)]`<sup>1.32.0</sup> | recipe | Set shebang recipe script's file extension to `EXT`. `EXT` should include a period if one is desired. |
+| `[exit-message]`<sup>1.39.0</sup> | recipe | Print error message if recipe fails regardless of `set no-exit-message`. |
 | `[freebsd]`<sup>1.47.0</sup> | recipe | Enable recipe on FreeBSD. |
 | `[group(NAME)]`<sup>1.27.0</sup> | module, recipe | Put recipe or module in [group](#groups) `NAME`. |
 | `[linux]`<sup>1.8.0</sup> | recipe | Enable recipe on Linux. |
@@ -2424,7 +2456,7 @@ delete-everything:
   rm -rf *
 ```
 
-The confirmation prompt may also be an expression<sup>master</sup> which may
+The confirmation prompt may also be an expression<sup>1.49.0</sup> which may
 reference assignments or recipe arguments:
 
 ```just
@@ -3892,7 +3924,9 @@ Bar!
 
 `just` normally prints error messages when a recipe line fails. These error
 messages can be suppressed using the `[no-exit-message]`<sup>1.7.0</sup>
-attribute. You may find this especially useful with a recipe that wraps a tool:
+attribute on individual recipes, or module-wide with
+`set no-exit-message`<sup>1.39.0</sup>. You may find this especially useful
+with a recipe that wraps a tool:
 
 ```just
 git *args:

@@ -15,6 +15,8 @@ pub(crate) struct Lexer<'src> {
   indentation: Vec<&'src str>,
   /// Interpolation token start stack
   interpolation_stack: Vec<Token<'src>>,
+  /// Source text line count
+  lines: usize,
   /// Next character to be lexed
   next: Option<char>,
   /// Current open delimiters
@@ -62,18 +64,19 @@ impl<'src> Lexer<'src> {
     };
 
     Self {
-      indentation: vec![""],
-      tokens: Vec::new(),
-      token_start: start,
-      token_end: start,
-      recipe_body_pending: false,
-      recipe_body: false,
-      interpolation_stack: Vec::new(),
-      open_delimiters: Vec::new(),
       chars,
+      indentation: vec![""],
+      interpolation_stack: Vec::new(),
+      lines: src.lines().count(),
       next,
-      src,
+      open_delimiters: Vec::new(),
       path,
+      recipe_body: false,
+      recipe_body_pending: false,
+      src,
+      token_end: start,
+      token_start: start,
+      tokens: Vec::new(),
     }
   }
 
@@ -87,7 +90,7 @@ impl<'src> Lexer<'src> {
         self.token_end.offset += len_utf8;
         self.token_end.column += len_utf8;
 
-        if c == '\n' {
+        if c == '\n' && self.token_end.line + 1 < self.lines {
           self.token_end.column = 0;
           self.token_end.line += 1;
         }
@@ -974,8 +977,8 @@ mod tests {
 
     let have_lexemes = have.iter().map(Token::lexeme).collect::<Vec<&str>>();
 
-    assert_eq!(have_kinds, want_kinds, "Token kind mismatch");
-    assert_eq!(have_lexemes, want_lexemes, "Token lexeme mismatch");
+    assert_eq!(have_kinds, want_kinds, "token kind mismatch");
+    assert_eq!(have_lexemes, want_lexemes, "token lexeme mismatch");
 
     let mut roundtrip = String::new();
 
@@ -983,20 +986,22 @@ mod tests {
       roundtrip.push_str(lexeme);
     }
 
-    assert_eq!(roundtrip, text, "Roundtrip mismatch");
+    assert_eq!(roundtrip, text, "roundtrip mismatch");
+
+    let lines = text.lines().count();
 
     let mut offset = 0;
     let mut line = 0;
     let mut column = 0;
 
     for token in have {
-      assert_eq!(token.offset, offset);
-      assert_eq!(token.line, line);
-      assert_eq!(token.lexeme().len(), token.length);
-      assert_eq!(token.column, column);
+      assert_eq!(token.offset, offset, "offset mismatch");
+      assert_eq!(token.line, line, "line mismatch");
+      assert_eq!(token.lexeme().len(), token.length, "length mismatch");
+      assert_eq!(token.column, column, "column mismatch");
 
       for c in token.lexeme().chars() {
-        if c == '\n' {
+        if c == '\n' && line + 1 < lines {
           line += 1;
           column = 0;
         } else {
