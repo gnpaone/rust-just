@@ -43,6 +43,15 @@ jobs:
           - NAME: linux-arm-musleabihf
             OS: ubuntu-22.04
             TARGET: arm-unknown-linux-musleabihf
+          - NAME: linux-armv7-musleabihf
+            OS: ubuntu-22.04
+            TARGET: armv7-unknown-linux-musleabihf
+          - NAME: linux-loong64-musl
+            OS: ubuntu-22.04
+            TARGET: loongarch64-unknown-linux-musl
+          - NAME: linux-riscv64-musl
+            OS: ubuntu-22.04
+            TARGET: riscv64gc-unknown-linux-musl
           - NAME: win32-x64-msvc
             OS: windows-2022
             TARGET: x86_64-pc-windows-msvc

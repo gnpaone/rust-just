@@ -20,6 +20,13 @@ export async function getExePath() {
     extension = ".exe";
   }
 
+  if (arch === "arm") {
+    const armVersion = (process as any).config?.variables?.arm_version;
+    if (armVersion === "7" || armVersion === 7) {
+      arch = "armv7";
+    }
+  }
+
   try {
     // Since the bin will be located inside `node_modules`, we can simply call import.meta.resolve
     return import.meta.resolve(
