@@ -53,7 +53,7 @@ jobs:
     strategy:
       matrix:
         runner: [ubuntu-latest]
-        target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
+        target: [x86_64, x86, aarch64, armv7, s390x, ppc64le, riscv64, loongarch64]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -85,7 +85,7 @@ jobs:
     strategy:
       matrix:
         runner: [ubuntu-latest]
-        target: [x86_64, x86, aarch64, armv7]
+        target: [x86_64, x86, aarch64, armv7, riscv64, loongarch64]
     steps:
       - uses: actions/checkout@v6
         with:
