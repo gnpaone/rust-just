@@ -27,9 +27,29 @@ jobs:
           repository: gnpaone/rust-just
           releases-only: true
 
+  validate-version:
+    name: Validate Version Match
+    runs-on: ubuntu-latest
+    needs: find-latest-tag
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.find-latest-tag.outputs.tag }}
+      - name: Check Cargo.toml version
+        run: |
+          CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -n 1 | cut -d'"' -f2)
+          TAG_VERSION="${{ needs.find-latest-tag.outputs.tag }}"
+          if [[ "$TAG_VERSION" == v* ]]; then
+            TAG_VERSION="${TAG_VERSION:1}"
+          fi
+          if [ "$CARGO_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch! Tag is $TAG_VERSION but Cargo.toml has $CARGO_VERSION"
+            exit 1
+          fi
+
   linux:
     runs-on: ${{ matrix.runner }}
-    needs: find-latest-tag
+    needs: [find-latest-tag, validate-version]
     strategy:
       matrix:
         runner: [ubuntu-latest]
@@ -61,7 +81,7 @@ jobs:
 
   musllinux:
     runs-on: ${{ matrix.runner }}
-    needs: find-latest-tag
+    needs: [find-latest-tag, validate-version]
     strategy:
       matrix:
         runner: [ubuntu-latest]
@@ -93,7 +113,7 @@ jobs:
 
   windows:
     runs-on: ${{ matrix.runner }}
-    needs: find-latest-tag
+    needs: [find-latest-tag, validate-version]
     strategy:
       matrix:
         runner: [windows-latest]
@@ -124,7 +144,7 @@ jobs:
 
   macos:
     runs-on: ${{ matrix.runner }}
-    needs: find-latest-tag
+    needs: [find-latest-tag, validate-version]
     strategy:
       matrix:
         runner: [macos-14]
@@ -155,7 +175,7 @@ jobs:
 
   sdist:
     runs-on: ubuntu-latest
-    needs: find-latest-tag
+    needs: [find-latest-tag, validate-version]
     steps:
       - uses: actions/checkout@v6
         with:
