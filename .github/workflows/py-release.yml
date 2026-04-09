@@ -14,14 +14,30 @@ permissions:
   contents: read
 
 jobs:
+  find-latest-tag:
+    name: Find Latest Tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.get-tag.outputs.tag }}
+    steps:
+      - name: Find latest tag
+        id: get-tag
+        uses: oprypin/find-latest-tag@v1
+        with:
+          repository: gnpaone/rust-just
+          releases-only: true
+
   linux:
     runs-on: ${{ matrix.runner }}
+    needs: find-latest-tag
     strategy:
       matrix:
         runner: [ubuntu-latest]
         target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.find-latest-tag.outputs.tag }}
       - name: Copy README.md and LICENSE
         run: |
           cp README.md pypi/
@@ -45,12 +61,15 @@ jobs:
 
   musllinux:
     runs-on: ${{ matrix.runner }}
+    needs: find-latest-tag
     strategy:
       matrix:
         runner: [ubuntu-latest]
         target: [x86_64, x86, aarch64, armv7]
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.find-latest-tag.outputs.tag }}
       - name: Copy README.md and LICENSE
         run: |
           cp README.md pypi/
@@ -74,12 +93,15 @@ jobs:
 
   windows:
     runs-on: ${{ matrix.runner }}
+    needs: find-latest-tag
     strategy:
       matrix:
         runner: [windows-latest]
         target: [x64, x86]
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.find-latest-tag.outputs.tag }}
       - name: Copy README.md and LICENSE
         run: |
           cp README.md pypi/
@@ -102,12 +124,15 @@ jobs:
 
   macos:
     runs-on: ${{ matrix.runner }}
+    needs: find-latest-tag
     strategy:
       matrix:
         runner: [macos-14]
         target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.find-latest-tag.outputs.tag }}
       - name: Copy README.md and LICENSE
         run: |
           cp README.md pypi/
@@ -130,8 +155,11 @@ jobs:
 
   sdist:
     runs-on: ubuntu-latest
+    needs: find-latest-tag
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.find-latest-tag.outputs.tag }}
       - name: Copy README.md and LICENSE
         run: |
           cp README.md pypi/
