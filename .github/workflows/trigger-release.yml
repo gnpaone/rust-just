@@ -2,10 +2,11 @@ name: Trigger release
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Sync repo"]
-    types:
-      - completed
+  push:
+    branches:
+      - master
+    paths:
+      - 'Cargo.toml'
 
 jobs:
   check:
