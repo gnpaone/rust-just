@@ -199,36 +199,36 @@ jobs:
           path: pypi/dist
           retention-days: 7
 
-  # release:
-  #   name: Release
-  #   runs-on: ubuntu-latest
-  #   # if: startsWith(github.ref, 'refs/tags/')
-  #   needs: [linux, musllinux, windows, macos, sdist]
-  #   steps:
-  #     - uses: actions/download-artifact@v8
-  #       with:
-  #         path: pypi/dist
-  #         pattern: wheels-*
-  #         merge-multiple: true
-  #     # - name: Check if version tag
-  #     #   id: check-tag
-  #     #   run: |
-  #     #     if [[ ${{ github.ref }} =~ ^refs/tags/[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  #     #       echo "is_version=true" >> $GITHUB_ENV
-  #     #     else
-  #     #       echo "is_version=false" >> $GITHUB_ENV
-  #     #     fi
-  #     - name: Install uv
-  #       uses: astral-sh/setup-uv@v5
-  #       with:
-  #         enable-cache: false
-  #     - name: Publish to PyPI
-  #       # if: env.is_version == 'true'
-  #       env:
-  #         UV_PUBLISH_TOKEN: ${{ vars.USE_TESTPYPI == 'true' && secrets.TESTPYPI_API_TOKEN || secrets.PYPI_API_TOKEN }}
-  #       run: |
-  #         if [ "${{ vars.USE_TESTPYPI }}" == "true" ]; then
-  #           uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple/ pypi/dist/*
-  #         else
-  #           uv publish pypi/dist/*
-  #         fi
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    # if: startsWith(github.ref, 'refs/tags/')
+    needs: [linux, musllinux, windows, macos, sdist]
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: pypi/dist
+          pattern: wheels-*
+          merge-multiple: true
+      # - name: Check if version tag
+      #   id: check-tag
+      #   run: |
+      #     if [[ ${{ github.ref }} =~ ^refs/tags/[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      #       echo "is_version=true" >> $GITHUB_ENV
+      #     else
+      #       echo "is_version=false" >> $GITHUB_ENV
+      #     fi
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+      - name: Publish to PyPI
+        # if: env.is_version == 'true'
+        env:
+          UV_PUBLISH_TOKEN: ${{ vars.USE_TESTPYPI == 'true' && secrets.TESTPYPI_API_TOKEN || secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ "${{ vars.USE_TESTPYPI }}" == "true" ]; then
+            uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple/ pypi/dist/*
+          else
+            uv publish pypi/dist/*
+          fi
