@@ -17,11 +17,11 @@ fn set_false() {
   Test::new()
     .justfile(
       r#"
-      set dotenv-load := false
+        set dotenv-load := false
 
-      @foo:
-        if [ -n "${DOTENV_KEY+1}" ]; then echo defined; else echo undefined; fi
-    "#,
+        @foo:
+          if [ -n "${DOTENV_KEY+1}" ]; then echo defined; else echo undefined; fi
+      "#,
     )
     .write(".env", "DOTENV_KEY=dotenv-value")
     .stdout("undefined\n")
@@ -132,11 +132,11 @@ fn filename_flag_overwrites_no_load() {
   Test::new()
     .justfile(
       "
-      set dotenv-load := false
+        set dotenv-load := false
 
-      foo:
-        @echo $JUST_TEST_VARIABLE
-    ",
+        foo:
+          @echo $JUST_TEST_VARIABLE
+      ",
     )
     .tree(tree! {
       ".env.special": "JUST_TEST_VARIABLE=bar"
@@ -171,12 +171,12 @@ fn path_flag_overwrites_no_load() {
 fn can_set_dotenv_filename_from_justfile() {
   Test::new()
     .justfile(
-      r#"
-        set dotenv-filename := ".env.special"
+      "
+        set dotenv-filename := '.env.special'
 
         foo:
           @echo $JUST_TEST_VARIABLE
-      "#,
+      ",
     )
     .tree(tree! {
       ".env.special": "JUST_TEST_VARIABLE=bar"
@@ -189,12 +189,12 @@ fn can_set_dotenv_filename_from_justfile() {
 fn can_set_dotenv_path_from_justfile() {
   Test::new()
     .justfile(
-      r#"
-        set dotenv-path := "subdir/.env"
+      "
+        set dotenv-path := 'subdir/.env'
 
         foo:
           @echo $JUST_TEST_VARIABLE
-      "#,
+      ",
     )
     .tree(tree! {
       subdir: {
@@ -209,12 +209,12 @@ fn can_set_dotenv_path_from_justfile() {
 fn program_argument_has_priority_for_dotenv_filename() {
   Test::new()
     .justfile(
-      r#"
-        set dotenv-filename := ".env.special"
+      "
+        set dotenv-filename := '.env.special'
 
         foo:
           @echo $JUST_TEST_VARIABLE
-      "#,
+      ",
     )
     .tree(tree! {
       ".env.special": "JUST_TEST_VARIABLE=bar",
@@ -321,13 +321,13 @@ fn dotenv_variable_in_function_in_backtick() {
   Test::new()
     .justfile(
       "
-  set dotenv-load
-  X:=env_var_or_default('DOTENV_KEY', 'foo')
-  Y:=env_var('DOTENV_KEY')
-  echo:
-    echo {{X}}
-    echo {{Y}}
-",
+        set dotenv-load
+        X:=env_var_or_default('DOTENV_KEY', 'foo')
+        Y:=env_var('DOTENV_KEY')
+        echo:
+          echo {{X}}
+          echo {{Y}}
+      ",
     )
     .write(".env", "DOTENV_KEY=dotenv-value")
     .stdout("dotenv-value\ndotenv-value\n")

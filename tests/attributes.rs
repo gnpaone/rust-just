@@ -5,18 +5,19 @@ fn all() {
   Test::new()
     .justfile(
       "
-      [dragonfly]
-      [freebsd]
-      [linux]
-      [macos]
-      [netbsd]
-      [no-exit-message]
-      [openbsd]
-      [unix]
-      [windows]
-      foo:
-        exit 1
-    ",
+        [dragonfly]
+        [freebsd]
+        [linux]
+        [macos]
+        [netbsd]
+        [no-exit-message]
+        [openbsd]
+        [android]
+        [unix]
+        [windows]
+        foo:
+          exit 1
+      ",
     )
     .stderr("exit 1\n")
     .failure();
@@ -27,19 +28,19 @@ fn duplicate_attributes_are_disallowed() {
   Test::new()
     .justfile(
       "
-      [no-exit-message]
-      [no-exit-message]
-      foo:
-        echo bar
-    ",
+        [no-exit-message]
+        [no-exit-message]
+        foo:
+          echo bar
+      ",
     )
     .stderr(
       "
-      error: Recipe attribute `no-exit-message` first used on line 1 is duplicated on line 2
-       ——▶ justfile:2:2
-        │
-      2 │ [no-exit-message]
-        │  ^^^^^^^^^^^^^^^
+        error: Recipe attribute `no-exit-message` first used on line 1 is duplicated on line 2
+         ——▶ justfile:2:2
+          │
+        2 │ [no-exit-message]
+          │  ^^^^^^^^^^^^^^^
       ",
     )
     .failure();
@@ -50,11 +51,11 @@ fn multiple_attributes_one_line() {
   Test::new()
     .justfile(
       "
-      [macos,windows,linux,openbsd,freebsd,dragonfly,netbsd]
-      [no-exit-message]
-      foo:
-        exit 1
-    ",
+        [macos,windows,linux,openbsd,freebsd,dragonfly,netbsd,android]
+        [no-exit-message]
+        foo:
+          exit 1
+      ",
     )
     .stderr("exit 1\n")
     .failure();
@@ -65,18 +66,18 @@ fn multiple_attributes_one_line_error_message() {
   Test::new()
     .justfile(
       "
-      [macos,windows linux,openbsd,freebsd,dragonfly,netbsd]
-      [no-exit-message]
-      foo:
-        exit 1
-    ",
+        [macos,windows linux,openbsd,freebsd,dragonfly,netbsd,android]
+        [no-exit-message]
+        foo:
+          exit 1
+      ",
     )
     .stderr(
       "
         error: Expected ']', ':', ',', or '(', but found identifier
          ——▶ justfile:1:16
           │
-        1 │ [macos,windows linux,openbsd,freebsd,dragonfly,netbsd]
+        1 │ [macos,windows linux,openbsd,freebsd,dragonfly,netbsd,android]
           │                ^^^^^
           ",
     )
@@ -88,20 +89,20 @@ fn multiple_attributes_one_line_duplicate_check() {
   Test::new()
     .justfile(
       "
-      [macos, windows, linux, openbsd, freebsd, dragonfly, netbsd]
-      [linux]
-      foo:
-        exit 1
-    ",
+        [macos, windows, linux, openbsd, freebsd, dragonfly, netbsd, android]
+        [linux]
+        foo:
+          exit 1
+      ",
     )
     .stderr(
       "
-      error: Recipe attribute `linux` first used on line 1 is duplicated on line 2
-       ——▶ justfile:2:2
-        │
-      2 │ [linux]
-        │  ^^^^^
-        ",
+        error: Recipe attribute `linux` first used on line 1 is duplicated on line 2
+         ——▶ justfile:2:2
+          │
+        2 │ [linux]
+          │  ^^^^^
+      ",
     )
     .failure();
 }
@@ -111,10 +112,10 @@ fn unexpected_attribute_argument() {
   Test::new()
     .justfile(
       "
-      [private('foo')]
-      foo:
-        exit 1
-    ",
+        [private('foo')]
+        foo:
+          exit 1
+      ",
     )
     .stderr(
       "
@@ -133,12 +134,12 @@ fn multiple_metadata_attributes() {
   Test::new()
     .justfile(
       "
-      [metadata('example')]
-      [metadata('sample')]
-      [no-exit-message]
-      foo:
-        exit 1
-    ",
+        [metadata('example')]
+        [metadata('sample')]
+        [no-exit-message]
+        foo:
+          exit 1
+      ",
     )
     .stderr("exit 1\n")
     .failure();
@@ -149,12 +150,12 @@ fn multiple_metadata_attributes_with_multiple_args() {
   Test::new()
     .justfile(
       "
-      [metadata('example', 'arg1')]
-      [metadata('sample', 'argument')]
-      [no-exit-message]
-      foo:
-        exit 1
-    ",
+        [metadata('example', 'arg1')]
+        [metadata('sample', 'argument')]
+        [no-exit-message]
+        foo:
+          exit 1
+      ",
     )
     .stderr("exit 1\n")
     .failure();
@@ -165,10 +166,10 @@ fn expected_metadata_attribute_argument() {
   Test::new()
     .justfile(
       "
-      [metadata]
-      foo:
-        exit 1
-    ",
+        [metadata]
+        foo:
+          exit 1
+      ",
     )
     .stderr(
       "
@@ -187,18 +188,18 @@ fn doc_attribute() {
   Test::new()
     .justfile(
       "
-    # Non-document comment
-    [doc('The real docstring')]
-    foo:
-      echo foo
-  ",
+        # Non-document comment
+        [doc('The real docstring')]
+        foo:
+          echo foo
+      ",
     )
     .args(["--list"])
     .stdout(
       "
-    Available recipes:
-        foo # The real docstring
-        ",
+        Available recipes:
+            foo # The real docstring
+      ",
     )
     .success();
 }
@@ -217,9 +218,9 @@ fn doc_attribute_suppress() {
     .args(["--list"])
     .stdout(
       "
-    Available recipes:
-        foo
-        ",
+        Available recipes:
+            foo
+      ",
     )
     .success();
 }
@@ -237,11 +238,11 @@ fn doc_multiline() {
     .args(["--list"])
     .stdout(
       "
-    Available recipes:
-        # multiline
-        # comment
-        foo
-        ",
+        Available recipes:
+            # multiline
+            # comment
+            foo
+      ",
     )
     .success();
 }
@@ -272,12 +273,12 @@ fn extension_on_linewise_error() {
     )
     .stderr(
       "
-  error: Recipe `baz` has invalid attribute `extension`
-   ——▶ justfile:2:1
-    │
-  2 │ baz:
-    │ ^^^
-",
+        error: Recipe `baz` has invalid attribute `extension`
+         ——▶ justfile:2:1
+          │
+        2 │ baz:
+          │ ^^^
+      ",
     )
     .failure();
 }
@@ -294,12 +295,12 @@ fn duplicate_non_repeatable_attributes_are_forbidden() {
     )
     .stderr(
       "
-  error: Recipe attribute `confirm` first used on line 1 is duplicated on line 2
-   ——▶ justfile:2:2
-    │
-  2 │ [confirm: 'no']
-    │  ^^^^^^^
-",
+        error: Recipe attribute `confirm` first used on line 1 is duplicated on line 2
+         ——▶ justfile:2:2
+          │
+        2 │ [confirm: 'no']
+          │  ^^^^^^^
+      ",
     )
     .failure();
 }
@@ -349,11 +350,11 @@ fn env_attribute_multiple() {
 fn env_attribute_in_recipe_params() {
   Test::new()
     .justfile(
-      r#"
-[env("foo", "bar")]
-baz x=`echo ${foo}.txt`:
-    @echo {{x}}
-"#,
+      "
+        [env('foo', 'bar')]
+        baz x=`echo ${foo}.txt`:
+            @echo {{x}}
+      ",
     )
     .stdout("bar.txt\n")
     .success();
@@ -363,23 +364,22 @@ baz x=`echo ${foo}.txt`:
 fn env_attribute_not_in_env_function() {
   Test::new()
     .justfile(
-      r#"
+      "
 
-[env("foo", "bar")]
-baz:
-  @echo {{ env("foo") }}.txt
+        [env('foo', 'bar')]
+        baz:
+          @echo {{ env('foo') }}.txt
 
-    "#,
+      ",
     )
     .stderr(
-      r#"
-error: Call to function `env` failed: environment variable `foo` not present
- ——▶ justfile:4:12
-  │
-4 │   @echo {{ env("foo") }}.txt
-  │            ^^^
-
-"#,
+      "
+        error: Call to function `env` failed: environment variable `foo` not present
+         ——▶ justfile:4:12
+          │
+        4 │   @echo {{ env('foo') }}.txt
+          │            ^^^
+      ",
     )
     .failure();
 }
@@ -396,12 +396,12 @@ fn env_attribute_too_few_arguments() {
     )
     .stderr(
       "
-  error: Attribute `env` got 1 argument but takes 2 arguments
-   ——▶ justfile:1:2
-    │
-  1 │ [env('MY_VAR')]
-    │  ^^^
-",
+        error: Attribute `env` got 1 argument but takes 2 arguments
+         ——▶ justfile:1:2
+          │
+        1 │ [env('MY_VAR')]
+          │  ^^^
+      ",
     )
     .failure();
 }
@@ -418,12 +418,12 @@ fn env_attribute_too_many_arguments() {
     )
     .stderr(
       "
-  error: Attribute `env` got 3 arguments but takes 2 arguments
-   ——▶ justfile:1:2
-    │
-  1 │ [env('A', 'B', 'C')]
-    │  ^^^
-",
+        error: Attribute `env` got 3 arguments but takes 2 arguments
+         ——▶ justfile:1:2
+          │
+        1 │ [env('A', 'B', 'C')]
+          │  ^^^
+      ",
     )
     .failure();
 }
@@ -441,12 +441,12 @@ fn env_attribute_duplicate_error() {
     )
     .stderr(
       "
-  error: Environment variable `VAR1` first set on line 1 is set again on line 2
-   ——▶ justfile:2:2
-    │
-  2 │ [env('VAR1', 'value 2')]
-    │  ^^^
-",
+        error: Environment variable `VAR1` first set on line 1 is set again on line 2
+         ——▶ justfile:2:2
+          │
+        2 │ [env('VAR1', 'value 2')]
+          │  ^^^
+      ",
     )
     .failure();
 }
