@@ -6,17 +6,17 @@ fn alias_listing() {
     .arg("--list")
     .justfile(
       "
-    foo:
-      echo foo
+        foo:
+          echo foo
 
-    alias f := foo
-  ",
+        alias f := foo
+      ",
     )
     .stdout(
       "
-    Available recipes:
-        foo # [alias: f]
-  ",
+        Available recipes:
+            foo # [alias: f]
+      ",
     )
     .success();
 }
@@ -36,9 +36,9 @@ fn alias_listing_with_doc() {
     .arg("--list")
     .stdout(
       "
-      Available recipes:
-          foo # foo command [alias: f]
-    ",
+        Available recipes:
+            foo # foo command [alias: f]
+      ",
     )
     .success();
 }
@@ -50,9 +50,9 @@ fn alias_listing_multiple_aliases() {
     .justfile("foo:\n  echo foo\nalias f := foo\nalias fo := foo")
     .stdout(
       "
-    Available recipes:
-        foo # [aliases: f, fo]
-  ",
+        Available recipes:
+            foo # [aliases: f, fo]
+      ",
     )
     .success();
 }
@@ -64,9 +64,9 @@ fn alias_listing_parameters() {
     .justfile("foo PARAM='foo':\n  echo {{PARAM}}\nalias f := foo")
     .stdout(
       "
-    Available recipes:
-        foo PARAM='foo' # [alias: f]
-  ",
+        Available recipes:
+            foo PARAM='foo' # [alias: f]
+      ",
     )
     .success();
 }
@@ -78,9 +78,9 @@ fn alias_listing_private() {
     .justfile("foo PARAM='foo':\n  echo {{PARAM}}\nalias _f := foo")
     .stdout(
       "
-    Available recipes:
-        foo PARAM='foo'
-  ",
+        Available recipes:
+            foo PARAM='foo'
+      ",
     )
     .success();
 }
@@ -111,17 +111,17 @@ fn bad_setting() {
   Test::new()
     .justfile(
       "
-    set foo
-  ",
+        set foo
+      ",
     )
     .stderr(
       "
-  error: Unknown setting `foo`
-   ——▶ justfile:1:5
-    │
-  1 │ set foo
-    │     ^^^
-  ",
+        error: Unknown setting `foo`
+         ——▶ justfile:1:5
+          │
+        1 │ set foo
+          │     ^^^
+      ",
     )
     .failure();
 }
@@ -131,17 +131,17 @@ fn bad_setting_with_keyword_name() {
   Test::new()
     .justfile(
       "
-    set if := 'foo'
-  ",
+        set if := 'foo'
+      ",
     )
     .stderr(
       "
-  error: Unknown setting `if`
-   ——▶ justfile:1:5
-    │
-  1 │ set if := 'foo'
-    │     ^^
-  ",
+        error: Unknown setting `if`
+         ——▶ justfile:1:5
+          │
+        1 │ set if := 'foo'
+          │     ^^
+      ",
     )
     .failure();
 }
@@ -162,12 +162,12 @@ fn duplicate_alias() {
     .justfile("alias foo := bar\nalias foo := baz\n")
     .stderr(
       "
-    error: Alias `foo` first defined on line 1 is redefined on line 2
-     ——▶ justfile:2:7
-      │
-    2 │ alias foo := baz
-      │       ^^^
-  ",
+        error: Alias `foo` first defined on line 1 is redefined on line 2
+         ——▶ justfile:2:7
+          │
+        2 │ alias foo := baz
+          │       ^^^
+      ",
     )
     .failure();
 }
@@ -178,12 +178,12 @@ fn unknown_alias_target() {
     .justfile("alias foo := bar\n")
     .stderr(
       "
-    error: Alias `foo` has an unknown target `bar`
-     ——▶ justfile:1:7
-      │
-    1 │ alias foo := bar
-      │       ^^^
-  ",
+        error: Alias `foo` has an unknown target `bar`
+         ——▶ justfile:1:7
+          │
+        1 │ alias foo := bar
+          │       ^^^
+      ",
     )
     .failure();
 }
@@ -191,15 +191,23 @@ fn unknown_alias_target() {
 #[test]
 fn alias_shadows_recipe() {
   Test::new()
-    .justfile("bar:\n  echo bar\nalias foo := bar\nfoo:\n  echo foo")
+    .justfile(
+      "
+        bar:
+          echo bar
+        alias foo := bar
+        foo:
+          echo foo
+      ",
+    )
     .stderr(
       "
-    error: Alias `foo` defined on line 3 is redefined as a recipe on line 4
-     ——▶ justfile:4:1
-      │
-    4 │ foo:
-      │ ^^^
-  ",
+        error: Alias `foo` defined on line 3 is redefined as a recipe on line 4
+         ——▶ justfile:4:1
+          │
+        4 │ foo:
+          │ ^^^
+      ",
     )
     .failure();
 }
@@ -303,12 +311,12 @@ fn unknown_dependency() {
     .justfile("bar:\nhello:\nfoo: bar baaaaaaaz hello")
     .stderr(
       "
-    error: Recipe `foo` has unknown dependency `baaaaaaaz`
-     ——▶ justfile:3:10
-      │
-    3 │ foo: bar baaaaaaaz hello
-      │          ^^^^^^^^^
-  ",
+        error: Recipe `foo` has unknown dependency `baaaaaaaz`
+         ——▶ justfile:3:10
+          │
+        3 │ foo: bar baaaaaaaz hello
+          │          ^^^^^^^^^
+      ",
     )
     .failure();
 }
@@ -337,12 +345,12 @@ fn backtick_code_assignment() {
     .justfile("b := a\na := `exit 100`\nbar:\n echo '{{`exit 200`}}'")
     .stderr(
       "
-    error: Backtick failed with exit code 100
-     ——▶ justfile:2:6
-      │
-    2 │ a := `exit 100`
-      │      ^^^^^^^^^^
-  ",
+        error: Backtick failed with exit code 100
+         ——▶ justfile:2:6
+          │
+        2 │ a := `exit 100`
+          │      ^^^^^^^^^^
+      ",
     )
     .status(100);
 }
@@ -353,12 +361,12 @@ fn backtick_code_interpolation() {
     .justfile("b := a\na := `echo hello`\nbar:\n echo '{{`exit 200`}}'")
     .stderr(
       "
-    error: Backtick failed with exit code 200
-     ——▶ justfile:4:10
-      │
-    4 │  echo '{{`exit 200`}}'
-      │          ^^^^^^^^^^
-  ",
+        error: Backtick failed with exit code 200
+         ——▶ justfile:4:10
+          │
+        4 │  echo '{{`exit 200`}}'
+          │          ^^^^^^^^^^
+      ",
     )
     .status(200);
 }
@@ -369,12 +377,12 @@ fn backtick_code_interpolation_mod() {
     .justfile("f:\n 無{{`exit 200`}}")
     .stderr(
       "
-    error: Backtick failed with exit code 200
-     ——▶ justfile:2:7
-      │
-    2 │  無{{`exit 200`}}
-      │      ^^^^^^^^^^
-  ",
+        error: Backtick failed with exit code 200
+         ——▶ justfile:2:7
+          │
+        2 │  無{{`exit 200`}}
+          │      ^^^^^^^^^^
+      ",
     )
     .status(200);
 }
@@ -384,9 +392,9 @@ fn backtick_code_interpolation_tab() {
   Test::new()
     .justfile(
       "
-    backtick-fail:
-    \techo {{`exit 200`}}
-  ",
+        backtick-fail:
+        \techo {{`exit 200`}}
+      ",
     )
     .stderr(
       "    error: Backtick failed with exit code 200
@@ -404,9 +412,9 @@ fn backtick_code_interpolation_tabs() {
   Test::new()
     .justfile(
       "
-    backtick-fail:
-    \techo {{\t`exit 200`}}
-  ",
+        backtick-fail:
+        \techo {{\t`exit 200`}}
+      ",
     )
     .stderr(
       "error: Backtick failed with exit code 200
@@ -424,18 +432,18 @@ fn backtick_code_interpolation_inner_tab() {
   Test::new()
     .justfile(
       "
-    backtick-fail:
-    \techo {{\t`exit\t\t200`}}
-  ",
+        backtick-fail:
+        \techo {{\t`exit\t\t200`}}
+      ",
     )
     .stderr(
       "
-    error: Backtick failed with exit code 200
-     ——▶ justfile:2:10
-      │
-    2 │     echo {{    `exit        200`}}
-      │                ^^^^^^^^^^^^^^^^^
-  ",
+        error: Backtick failed with exit code 200
+         ——▶ justfile:2:10
+          │
+        2 │     echo {{    `exit        200`}}
+          │                ^^^^^^^^^^^^^^^^^
+      ",
     )
     .status(200);
 }
@@ -445,18 +453,18 @@ fn backtick_code_interpolation_leading_emoji() {
   Test::new()
     .justfile(
       "
-    backtick-fail:
-    \techo 😬{{`exit 200`}}
-  ",
+        backtick-fail:
+        \techo 😬{{`exit 200`}}
+      ",
     )
     .stderr(
       "
-    error: Backtick failed with exit code 200
-     ——▶ justfile:2:13
-      │
-    2 │     echo 😬{{`exit 200`}}
-      │              ^^^^^^^^^^
-  ",
+        error: Backtick failed with exit code 200
+         ——▶ justfile:2:13
+          │
+        2 │     echo 😬{{`exit 200`}}
+          │              ^^^^^^^^^^
+      ",
     )
     .status(200);
 }
@@ -466,18 +474,18 @@ fn backtick_code_interpolation_unicode_hell() {
   Test::new()
     .justfile(
       "
-    backtick-fail:
-    \techo \t\t\t😬鎌鼬{{\t\t`exit 200 # \t\t\tabc`}}\t\t\t😬鎌鼬
-  ",
+        backtick-fail:
+        \techo \t\t\t😬鎌鼬{{\t\t`exit 200 # \t\t\tabc`}}\t\t\t😬鎌鼬
+      ",
     )
     .stderr(
       "
-    error: Backtick failed with exit code 200
-     ——▶ justfile:2:24
-      │
-    2 │     echo             😬鎌鼬{{        `exit 200 #             abc`}}            😬鎌鼬
-      │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  ",
+        error: Backtick failed with exit code 200
+         ——▶ justfile:2:24
+          │
+        2 │     echo             😬鎌鼬{{        `exit 200 #             abc`}}            😬鎌鼬
+          │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      ",
     )
     .status(200);
 }
@@ -493,20 +501,20 @@ fn backtick_code_long() {
 
 
 
-    b := a
-    a := `echo hello`
-    bar:
-     echo '{{`exit 200`}}'
-  ",
+        b := a
+        a := `echo hello`
+        bar:
+         echo '{{`exit 200`}}'
+      ",
     )
     .stderr(
       "
-    error: Backtick failed with exit code 200
-      ——▶ justfile:10:10
-       │
-    10 │  echo '{{`exit 200`}}'
-       │          ^^^^^^^^^^
-  ",
+        error: Backtick failed with exit code 200
+          ——▶ justfile:10:10
+           │
+        10 │  echo '{{`exit 200`}}'
+           │          ^^^^^^^^^^
+      ",
     )
     .status(200);
 }
@@ -522,12 +530,12 @@ fn shebang_backtick_failure() {
     )
     .stderr(
       "
-    error: Backtick failed with exit code 123
-     ——▶ justfile:4:9
-      │
-    4 │  echo {{`exit 123`}}
-      │         ^^^^^^^^^^
-  ",
+        error: Backtick failed with exit code 123
+         ——▶ justfile:4:9
+          │
+        4 │  echo {{`exit 123`}}
+          │         ^^^^^^^^^^
+      ",
     )
     .status(123);
 }
@@ -543,13 +551,13 @@ fn command_backtick_failure() {
     .stdout("hello\n")
     .stderr(
       "
-    echo hello
-    error: Backtick failed with exit code 123
-     ——▶ justfile:3:9
-      │
-    3 │  echo {{`exit 123`}}
-      │         ^^^^^^^^^^
-  ",
+        echo hello
+        error: Backtick failed with exit code 123
+         ——▶ justfile:3:9
+          │
+        3 │  echo {{`exit 123`}}
+          │         ^^^^^^^^^^
+      ",
     )
     .status(123);
 }
@@ -565,12 +573,12 @@ a := `exit 222`",
     )
     .stderr(
       "
-    error: Backtick failed with exit code 222
-     ——▶ justfile:4:6
-      │
-    4 │ a := `exit 222`
-      │      ^^^^^^^^^^
-  ",
+        error: Backtick failed with exit code 222
+         ——▶ justfile:4:6
+          │
+        4 │ a := `exit 222`
+          │      ^^^^^^^^^^
+      ",
     )
     .status(222);
 }
@@ -582,7 +590,7 @@ fn dry_run() {
     .arg("shebang")
     .arg("command")
     .justfile(
-      r"
+      "
 var := `echo stderr 1>&2; echo backtick`
 
 command:
@@ -613,7 +621,7 @@ echo `echo command interpolation`
 fn line_error_spacing() {
   Test::new()
     .justfile(
-      r"
+      "
 
 
 
@@ -623,8 +631,8 @@ fn line_error_spacing() {
 
 
 
-^^^
-",
+        ^^^
+      ",
     )
     .stderr(
       "error: Unknown start of token '^'
@@ -644,9 +652,9 @@ fn argument_single() {
     .arg("ARGUMENT")
     .justfile(
       "
-foo A:
-  echo {{A}}
-    ",
+        foo A:
+          echo {{A}}
+      ",
     )
     .stdout("ARGUMENT\n")
     .stderr("echo ARGUMENT\n")
@@ -661,9 +669,9 @@ fn argument_multiple() {
     .arg("TWO")
     .justfile(
       "
-foo A B:
-  echo A:{{A}} B:{{B}}
-    ",
+        foo A B:
+          echo A:{{A}} B:{{B}}
+      ",
     )
     .stdout("A:ONE B:TWO\n")
     .stderr("echo A:ONE B:TWO\n")
@@ -680,9 +688,9 @@ fn argument_mismatch_more() {
     .stderr("error: Justfile does not contain recipe `THREE`\n")
     .justfile(
       "
-foo A B:
-  echo A:{{A}} B:{{B}}
-    ",
+        foo A B:
+          echo A:{{A}} B:{{B}}
+      ",
     )
     .failure();
 }
@@ -694,9 +702,9 @@ fn argument_mismatch_fewer() {
     .arg("ONE")
     .justfile(
       "
-foo A B:
-  echo A:{{A}} B:{{B}}
-    ",
+        foo A B:
+          echo A:{{A}} B:{{B}}
+      ",
     )
     .stderr("error: Recipe `foo` got 1 positional argument but takes 2\nusage:\n    just foo A B\n")
     .failure();
@@ -711,9 +719,9 @@ fn argument_mismatch_more_with_default() {
     .arg("THREE")
     .justfile(
       "
-foo A B='B':
-  echo A:{{A}} B:{{B}}
-    ",
+        foo A B='B':
+          echo A:{{A}} B:{{B}}
+      ",
     )
     .stderr("error: Justfile does not contain recipe `THREE`\n")
     .failure();
@@ -726,16 +734,16 @@ fn argument_mismatch_fewer_with_default() {
     .arg("bar")
     .justfile(
       "
-foo A B C='C':
-  echo A:{{A}} B:{{B}} C:{{C}}
-    ",
+        foo A B C='C':
+          echo A:{{A}} B:{{B}} C:{{C}}
+      ",
     )
     .stderr(
       "
-    error: Recipe `foo` got 1 positional argument but takes at least 2
-    usage:
-        just foo A B [C]
-  ",
+        error: Recipe `foo` got 1 positional argument but takes at least 2
+        usage:
+            just foo A B [C]
+      ",
     )
     .failure();
 }
@@ -918,10 +926,10 @@ fn use_string_default() {
     .arg("ABC")
     .justfile(
       r#"
-bar:
-hello baz arg="XYZ\t\"	":
-  echo '{{baz}}...{{arg}}'
-"#,
+        bar:
+        hello baz arg="XYZ\t\"	":
+          echo '{{baz}}...{{arg}}'
+      "#,
     )
     .stdout("ABC...XYZ\t\"\t\n")
     .stderr("echo 'ABC...XYZ\t\"\t'\n")
@@ -935,10 +943,10 @@ fn use_raw_string_default() {
     .arg("ABC")
     .justfile(
       r#"
-bar:
-hello baz arg='XYZ"	':
-  printf '{{baz}}...{{arg}}'
-"#,
+        bar:
+        hello baz arg='XYZ"	':
+          printf '{{baz}}...{{arg}}'
+      "#,
     )
     .stdout("ABC...XYZ\"\t")
     .stderr("printf 'ABC...XYZ\"\t'\n")
@@ -952,10 +960,10 @@ fn supply_use_default() {
     .arg("0")
     .arg("1")
     .justfile(
-      r"
-hello a b='B' c='C':
-  echo {{a}} {{b}} {{c}}
-",
+      "
+        hello a b='B' c='C':
+          echo {{a}} {{b}} {{c}}
+      ",
     )
     .stdout("0 1 C\n")
     .stderr("echo 0 1 C\n")
@@ -970,10 +978,10 @@ fn supply_defaults() {
     .arg("1")
     .arg("2")
     .justfile(
-      r"
-hello a b='B' c='C':
-  echo {{a}} {{b}} {{c}}
-",
+      "
+        hello a b='B' c='C':
+          echo {{a}} {{b}} {{c}}
+      ",
     )
     .stdout("0 1 2\n")
     .stderr("echo 0 1 2\n")
@@ -987,24 +995,24 @@ fn list() {
     .justfile(
       r#"
 
-# this does a thing
-hello a b='B	' c='C':
-  echo {{a}} {{b}} {{c}}
+        # this does a thing
+        hello a b='B	' c='C':
+          echo {{a}} {{b}} {{c}}
 
-# this comment will be ignored
+        # this comment will be ignored
 
-a Z="\t z":
+        a Z="\t z":
 
-# this recipe will not appear
-_private-recipe:
-"#,
+        # this recipe will not appear
+        _private-recipe:
+      "#,
     )
     .stdout(
       r#"
-    Available recipes:
-        a Z="\t z"
-        hello a b='B	' c='C' # this does a thing
-  "#,
+        Available recipes:
+            a Z="\t z"
+            hello a b='B	' c='C' # this does a thing
+      "#,
     )
     .success();
 }
@@ -1016,23 +1024,23 @@ fn list_alignment() {
     .justfile(
       r#"
 
-# this does a thing
-hello a b='B	' c='C':
-  echo {{a}} {{b}} {{c}}
+        # this does a thing
+        hello a b='B	' c='C':
+          echo {{a}} {{b}} {{c}}
 
-# something else
-a Z="\t z":
+        # something else
+        a Z="\t z":
 
-# this recipe will not appear
-_private-recipe:
-"#,
+        # this recipe will not appear
+        _private-recipe:
+      "#,
     )
     .stdout(
       r#"
-    Available recipes:
-        a Z="\t z"           # something else
-        hello a b='B	' c='C' # this does a thing
-  "#,
+        Available recipes:
+            a Z="\t z"           # something else
+            hello a b='B	' c='C' # this does a thing
+      "#,
     )
     .success();
 }
@@ -1044,28 +1052,28 @@ fn list_alignment_long() {
     .justfile(
       r#"
 
-# this does a thing
-hello a b='B	' c='C':
-  echo {{a}} {{b}} {{c}}
+        # this does a thing
+        hello a b='B	' c='C':
+          echo {{a}} {{b}} {{c}}
 
-# this does another thing
-x a b='B	' c='C':
-  echo {{a}} {{b}} {{c}}
+        # this does another thing
+        x a b='B	' c='C':
+          echo {{a}} {{b}} {{c}}
 
-# something else
-this-recipe-is-very-very-very-very-very-very-very-very-important Z="\t z":
+        # something else
+        this-recipe-is-very-very-very-very-very-very-very-very-important Z="\t z":
 
-# this recipe will not appear
-_private-recipe:
-"#,
+        # this recipe will not appear
+        _private-recipe:
+      "#,
     )
     .stdout(
       r#"
-    Available recipes:
-        hello a b='B	' c='C' # this does a thing
-        this-recipe-is-very-very-very-very-very-very-very-very-important Z="\t z" # something else
-        x a b='B	' c='C'     # this does another thing
-  "#,
+        Available recipes:
+            hello a b='B	' c='C' # this does a thing
+            this-recipe-is-very-very-very-very-very-very-very-very-important Z="\t z" # something else
+            x a b='B	' c='C'     # this does another thing
+      "#,
     )
     .success();
 }
@@ -1075,18 +1083,18 @@ fn list_sorted() {
   Test::new()
     .arg("--list")
     .justfile(
-      r"
-alias c := b
-b:
-a:
-",
+      "
+        alias c := b
+        b:
+        a:
+      ",
     )
     .stdout(
-      r"
-    Available recipes:
-        a
-        b # [alias: c]
-  ",
+      "
+        Available recipes:
+            a
+            b # [alias: c]
+      ",
     )
     .success();
 }
@@ -1097,18 +1105,18 @@ fn list_unsorted() {
     .arg("--list")
     .arg("--unsorted")
     .justfile(
-      r"
-alias c := b
-b:
-a:
-",
+      "
+        alias c := b
+        b:
+        a:
+      ",
     )
     .stdout(
-      r"
-    Available recipes:
-        b # [alias: c]
-        a
-  ",
+      "
+        Available recipes:
+            b # [alias: c]
+            a
+      ",
     )
     .success();
 }
@@ -1120,17 +1128,17 @@ fn list_heading() {
     .arg("--list-heading")
     .arg("Cool stuff…\n")
     .justfile(
-      r"
-a:
-b:
-",
+      "
+        a:
+        b:
+      ",
     )
     .stdout(
-      r"
-    Cool stuff…
-        a
-        b
-  ",
+      "
+        Cool stuff…
+            a
+            b
+      ",
     )
     .success();
 }
@@ -1142,17 +1150,17 @@ fn list_prefix() {
     .arg("--list-prefix")
     .arg("····")
     .justfile(
-      r"
-a:
-b:
-",
+      "
+        a:
+        b:
+      ",
     )
     .stdout(
-      r"
-    Available recipes:
-    ····a
-    ····b
-  ",
+      "
+        Available recipes:
+        ····a
+        ····b
+      ",
     )
     .success();
 }
@@ -1166,16 +1174,16 @@ fn list_empty_prefix_and_heading() {
     .arg("--list-prefix")
     .arg("")
     .justfile(
-      r"
-a:
-b:
-",
+      "
+        a:
+        b:
+      ",
     )
     .stdout(
-      r"
-    a
-    b
-  ",
+      "
+        a
+        b
+      ",
     )
     .success();
 }
@@ -1241,11 +1249,11 @@ fn line_continuation_with_space() {
   Test::new()
     .justfile(
       r"
-foo:
-  echo a\
-         b  \
-             c
-",
+        foo:
+          echo a\
+                 b  \
+                     c
+      ",
     )
     .stdout("ab c\n")
     .stderr("echo ab  c\n")
@@ -1257,11 +1265,11 @@ fn line_continuation_with_quoted_space() {
   Test::new()
     .justfile(
       r"
-foo:
-  echo 'a\
-         b  \
-             c'
-",
+        foo:
+          echo 'a\
+                 b  \
+                     c'
+      ",
     )
     .stdout("ab  c\n")
     .stderr("echo 'ab  c'\n")
@@ -1273,11 +1281,11 @@ fn line_continuation_no_space() {
   Test::new()
     .justfile(
       r"
-foo:
-  echo a\
-  b\
-  c
-",
+        foo:
+          echo a\
+          b\
+          c
+      ",
     )
     .stdout("abc\n")
     .stderr("echo abc\n")
@@ -1288,10 +1296,10 @@ foo:
 fn infallible_command() {
   Test::new()
     .justfile(
-      r"
-infallible:
-  -exit 101
-",
+      "
+        infallible:
+          -exit 101
+      ",
     )
     .stderr("exit 101\n")
     .success();
@@ -1301,14 +1309,14 @@ infallible:
 fn infallible_with_failing() {
   Test::new()
     .justfile(
-      r"
-infallible:
-  -exit 101
-  exit 202
-",
+      "
+        infallible:
+          -exit 101
+          exit 202
+      ",
     )
     .stderr(
-      r"exit 101
+      "exit 101
 exit 202
 error: Recipe `infallible` failed on line 3 with exit code 202
 ",
@@ -1320,12 +1328,12 @@ error: Recipe `infallible` failed on line 3 with exit code 202
 fn quiet_recipe() {
   Test::new()
     .justfile(
-      r"
-@quiet:
-  # a
-  # b
-  @echo c
-",
+      "
+        @quiet:
+          # a
+          # b
+          @echo c
+      ",
     )
     .stdout("c\n")
     .stderr("echo c\n")
@@ -1336,11 +1344,11 @@ fn quiet_recipe() {
 fn quiet_shebang_recipe() {
   Test::new()
     .justfile(
-      r"
-@quiet:
-  #!/bin/sh
-  echo hello
-",
+      "
+        @quiet:
+          #!/bin/sh
+          echo hello
+      ",
     )
     .stdout("hello\n")
     .stderr("#!/bin/sh\necho hello\n")
@@ -1352,11 +1360,11 @@ fn complex_dependencies() {
   Test::new()
     .arg("b")
     .justfile(
-      r"
-a: b
-b:
-c: b a
-",
+      "
+        a: b
+        b:
+        c: b a
+      ",
     )
     .success();
 }
@@ -1366,16 +1374,16 @@ fn undefined_function_in_assignment() {
   Test::new()
     .arg("bar")
     .justfile(
-      r#"foo := foo() + "hello"
-bar:"#,
+      "foo := foo() + 'hello'
+bar:",
     )
     .stderr(
-      r#"error: Call to undefined function `foo`
+      "error: Call to undefined function `foo`
  ——▶ justfile:1:8
   │
-1 │ foo := foo() + "hello"
+1 │ foo := foo() + 'hello'
   │        ^^^
-"#,
+",
     )
     .failure();
 }
@@ -1386,9 +1394,9 @@ fn dependency_takes_arguments_exact() {
     .arg("b")
     .justfile(
       "
-    a FOO:
-    b: a
-  ",
+        a FOO:
+        b: a
+      ",
     )
     .stderr(
       "error: Dependency `a` got 0 arguments but takes 1 argument
@@ -1407,9 +1415,9 @@ fn dependency_takes_arguments_at_least() {
     .arg("b")
     .justfile(
       "
-    a FOO LUZ='hello':
-    b: a
-  ",
+        a FOO LUZ='hello':
+        b: a
+      ",
     )
     .stderr(
       "error: Dependency `a` got 0 arguments but takes at least 1 argument
@@ -1428,9 +1436,9 @@ fn dependency_takes_arguments_at_most() {
     .arg("b")
     .justfile(
       "
-    a FOO LUZ='hello':
-    b: (a '0' '1' '2')
-  ",
+        a FOO LUZ='hello':
+        b: (a '0' '1' '2')
+      ",
     )
     .stderr(
       "error: Dependency `a` got 3 arguments but takes at most 2 arguments
@@ -1498,7 +1506,7 @@ fn unexpected_token_in_dependency_position() {
     .justfile("foo: 'bar'")
     .stderr(
       "error: Expected '&&', comment, end of file, end of line, \
-    identifier, or '(', but found string
+    identifier, indent, or '(', but found string
  ——▶ justfile:1:6
   │
 1 │ foo: 'bar'
@@ -1594,12 +1602,12 @@ fn variable_circular_dependency_with_additional_variable() {
     .arg("a")
     .justfile(
       "
-    a := ''
-    x := y
-    y := x
+        a := ''
+        x := y
+        y := x
 
-    a:
-  ",
+        a:
+      ",
     )
     .stderr(
       "error: Variable `x` depends on its own value: `x -> y -> x`
@@ -1623,9 +1631,9 @@ fn plus_variadic_recipe() {
     .arg(" 4 ")
     .justfile(
       "
-a x y +z:
-  echo {{x}} {{y}} {{z}}
-",
+        a x y +z:
+          echo {{x}} {{y}} {{z}}
+      ",
     )
     .stdout("0 1 2 3 4\n")
     .stderr("echo 0 1 2 3  4 \n")
@@ -1643,9 +1651,9 @@ fn plus_variadic_ignore_default() {
     .arg(" 4 ")
     .justfile(
       "
-a x y +z='HELLO':
-  echo {{x}} {{y}} {{z}}
-",
+        a x y +z='HELLO':
+          echo {{x}} {{y}} {{z}}
+      ",
     )
     .stdout("0 1 2 3 4\n")
     .stderr("echo 0 1 2 3  4 \n")
@@ -1660,9 +1668,9 @@ fn plus_variadic_use_default() {
     .arg("1")
     .justfile(
       "
-a x y +z='HELLO':
-  echo {{x}} {{y}} {{z}}
-",
+        a x y +z='HELLO':
+          echo {{x}} {{y}} {{z}}
+      ",
     )
     .stdout("0 1 HELLO\n")
     .stderr("echo 0 1 HELLO\n")
@@ -1677,9 +1685,9 @@ fn plus_variadic_too_few() {
     .arg("1")
     .justfile(
       "
-a x y +z:
-  echo {{x}} {{y}} {{z}}
-",
+        a x y +z:
+          echo {{x}} {{y}} {{z}}
+      ",
     )
     .stderr(
       "
@@ -1702,9 +1710,9 @@ fn star_variadic_recipe() {
     .arg(" 4 ")
     .justfile(
       "
-a x y *z:
-  echo {{x}} {{y}} {{z}}
-",
+        a x y *z:
+          echo {{x}} {{y}} {{z}}
+      ",
     )
     .stdout("0 1 2 3 4\n")
     .stderr("echo 0 1 2 3  4 \n")
@@ -1719,9 +1727,9 @@ fn star_variadic_none() {
     .arg("1")
     .justfile(
       "
-a x y *z:
-  echo {{x}} {{y}} {{z}}
-",
+        a x y *z:
+          echo {{x}} {{y}} {{z}}
+      ",
     )
     .stdout("0 1\n")
     .stderr("echo 0 1 \n")
@@ -1739,9 +1747,9 @@ fn star_variadic_ignore_default() {
     .arg(" 4 ")
     .justfile(
       "
-a x y *z='HELLO':
-  echo {{x}} {{y}} {{z}}
-",
+        a x y *z='HELLO':
+          echo {{x}} {{y}} {{z}}
+      ",
     )
     .stdout("0 1 2 3 4\n")
     .stderr("echo 0 1 2 3  4 \n")
@@ -1756,9 +1764,9 @@ fn star_variadic_use_default() {
     .arg("1")
     .justfile(
       "
-a x y *z='HELLO':
-  echo {{x}} {{y}} {{z}}
-",
+        a x y *z='HELLO':
+          echo {{x}} {{y}} {{z}}
+      ",
     )
     .stdout("0 1 HELLO\n")
     .stderr("echo 0 1 HELLO\n")
@@ -1770,9 +1778,9 @@ fn star_then_plus_variadic() {
   Test::new()
     .justfile(
       "
-foo *a +b:
-  echo {{a}} {{b}}
-",
+        foo *a +b:
+          echo {{a}} {{b}}
+      ",
     )
     .stderr(
       "error: Expected \':\' or \'=\', but found \'+\'
@@ -1790,9 +1798,9 @@ fn plus_then_star_variadic() {
   Test::new()
     .justfile(
       "
-foo +a *b:
-  echo {{a}} {{b}}
-",
+        foo +a *b:
+          echo {{a}} {{b}}
+      ",
     )
     .stderr(
       "error: Expected \':\' or \'=\', but found \'*\'
@@ -1819,15 +1827,15 @@ fn argument_grouping() {
     .arg("5")
     .justfile(
       "
-FOO A B='blarg':
-  echo foo: {{A}} {{B}}
+        FOO A B='blarg':
+          echo foo: {{A}} {{B}}
 
-BAR X:
-  echo bar: {{X}}
+        BAR X:
+          echo bar: {{X}}
 
-BAZ +Z:
-  echo baz: {{Z}}
-",
+        BAZ +Z:
+          echo baz: {{Z}}
+      ",
     )
     .stdout("bar: 0\nfoo: 1 2\nbaz: 3 4 5\n")
     .stderr("echo bar: 0\necho foo: 1 2\necho baz: 3 4 5\n")
@@ -1839,10 +1847,10 @@ fn missing_second_dependency() {
   Test::new()
     .justfile(
       "
-x:
+        x:
 
-a: x y
-",
+        a: x y
+      ",
     )
     .stderr(
       "error: Recipe `a` has unknown dependency `y`
@@ -1863,19 +1871,19 @@ fn list_colors() {
     .arg("--list")
     .justfile(
       "
-# comment
-a B C +D='hello':
-  echo {{B}} {{C}} {{D}}
-",
+        # comment
+        a B C +D='hello':
+          echo {{B}} {{C}} {{D}}
+      ",
     )
     .stdout(
       "
-    Available recipes:
-        a \
-    \u{1b}[36mB\u{1b}[0m \u{1b}[36mC\u{1b}[0m \u{1b}[35m+\
-    \u{1b}[0m\u{1b}[36mD\u{1b}[0m=\u{1b}[32m'hello'\u{1b}[0m \
-     \u{1b}[34m#\u{1b}[0m \u{1b}[34mcomment\u{1b}[0m
-  ",
+        Available recipes:
+            a \
+        \u{1b}[36mB\u{1b}[0m \u{1b}[36mC\u{1b}[0m \u{1b}[35m+\
+        \u{1b}[0m\u{1b}[36mD\u{1b}[0m=\u{1b}[32m'hello'\u{1b}[0m \
+         \u{1b}[34m#\u{1b}[0m \u{1b}[34mcomment\u{1b}[0m
+      ",
     )
     .success();
 }
@@ -1889,10 +1897,10 @@ fn run_colors() {
     .arg("--verbose")
     .justfile(
       "
-# comment
-a:
-  echo hi
-",
+        # comment
+        a:
+          echo hi
+      ",
     )
     .stdout("hi\n")
     .stderr("\u{1b}[1;36m===> Running recipe `a`...\u{1b}[0m\n\u{1b}[1mecho hi\u{1b}[0m\n")
@@ -1909,10 +1917,10 @@ fn no_highlight() {
     .arg("--verbose")
     .justfile(
       "
-# comment
-a:
-  echo hi
-",
+        # comment
+        a:
+          echo hi
+      ",
     )
     .stdout("hi\n")
     .stderr("\u{1b}[1;36m===> Running recipe `a`...\u{1b}[0m\necho hi\n")
@@ -1928,9 +1936,9 @@ fn trailing_flags() {
     .arg("--flags")
     .justfile(
       "
-echo A B C:
-  echo {{A}} {{B}} {{C}}
-",
+        echo A B C:
+          echo {{A}} {{B}} {{C}}
+      ",
     )
     .stdout("--some --awesome --flags\n")
     .stderr("echo --some --awesome --flags\n")
@@ -1943,11 +1951,11 @@ fn comment_before_variable() {
     .arg("echo")
     .justfile(
       "
-#
-A:='1'
-echo:
-  echo {{A}}
- ",
+        #
+        A:='1'
+        echo:
+          echo {{A}}
+      ",
     )
     .stdout("1\n")
     .stderr("echo 1\n")
@@ -1959,8 +1967,8 @@ fn invalid_escape_sequence_message() {
   Test::new()
     .justfile(
       r#"
-X := "\'"
-"#,
+        X := "\'"
+      "#,
     )
     .stderr(
       r#"error: `\'` is not a valid escape sequence
@@ -1978,11 +1986,11 @@ fn unknown_variable_in_default() {
   Test::new()
     .justfile(
       "
-     foo x=bar:
-   ",
+        foo x=bar:
+      ",
     )
     .stderr(
-      r"error: Variable `bar` not defined
+      "error: Variable `bar` not defined
  ——▶ justfile:1:7
   │
 1 │ foo x=bar:
@@ -1997,11 +2005,11 @@ fn undefined_function_in_default() {
   Test::new()
     .justfile(
       "
-foo x=bar():
-",
+        foo x=bar():
+      ",
     )
     .stderr(
-      r"error: Call to undefined function `bar`
+      "error: Call to undefined function `bar`
  ——▶ justfile:1:7
   │
 1 │ foo x=bar():
@@ -2016,9 +2024,9 @@ fn default_string() {
   Test::new()
     .justfile(
       "
-foo x='bar':
-  echo {{x}}
-",
+        foo x='bar':
+          echo {{x}}
+      ",
     )
     .stdout("bar\n")
     .stderr("echo bar\n")
@@ -2030,9 +2038,9 @@ fn default_concatenation() {
   Test::new()
     .justfile(
       "
-foo x=(`echo foo` + 'bar'):
-  echo {{x}}
-",
+        foo x=(`echo foo` + 'bar'):
+          echo {{x}}
+      ",
     )
     .stdout("foobar\n")
     .stderr("echo foobar\n")
@@ -2044,9 +2052,9 @@ fn default_backtick() {
   Test::new()
     .justfile(
       "
-foo x=`echo foo`:
-  echo {{x}}
-",
+        foo x=`echo foo`:
+          echo {{x}}
+      ",
     )
     .stdout("foo\n")
     .stderr("echo foo\n")
@@ -2058,10 +2066,10 @@ fn default_variable() {
   Test::new()
     .justfile(
       "
-y := 'foo'
-foo x=y:
-  echo {{x}}
-",
+        y := 'foo'
+        foo x=y:
+          echo {{x}}
+      ",
     )
     .stdout("foo\n")
     .stderr("echo foo\n")
@@ -2073,18 +2081,18 @@ fn unterminated_interpolation_eol() {
   Test::new()
     .justfile(
       "
-    foo:
-      echo {{
-  ",
+        foo:
+          echo {{
+      ",
     )
     .stderr(
-      r"
-    error: Unterminated interpolation
-     ——▶ justfile:2:8
-      │
-    2 │   echo {{
-      │        ^^
-  ",
+      "
+        error: Unterminated interpolation
+         ——▶ justfile:2:8
+          │
+        2 │   echo {{
+          │        ^^
+      ",
     )
     .failure();
 }
@@ -2094,18 +2102,18 @@ fn unterminated_interpolation_eof() {
   Test::new()
     .justfile(
       "
-    foo:
-      echo {{
-  ",
+        foo:
+          echo {{
+      ",
     )
     .stderr(
-      r"
-    error: Unterminated interpolation
-     ——▶ justfile:2:8
-      │
-    2 │   echo {{
-      │        ^^
-  ",
+      "
+        error: Unterminated interpolation
+         ——▶ justfile:2:8
+          │
+        2 │   echo {{
+          │        ^^
+      ",
     )
     .failure();
 }
@@ -2115,17 +2123,17 @@ fn unknown_start_of_token() {
   Test::new()
     .justfile(
       "
-assembly_source_files = %(wildcard src/arch/$(arch)/*.s)
+        assembly_source_files = %(wildcard src/arch/$(arch)/*.s)
       ",
     )
     .stderr(
-      r"
-    error: Unknown start of token '%'
-     ——▶ justfile:1:25
-      │
-    1 │ assembly_source_files = %(wildcard src/arch/$(arch)/*.s)
-      │                         ^
-  ",
+      "
+        error: Unknown start of token '%'
+         ——▶ justfile:1:25
+          │
+        1 │ assembly_source_files = %(wildcard src/arch/$(arch)/*.s)
+          │                         ^
+      ",
     )
     .failure();
 }
@@ -2135,17 +2143,17 @@ fn unknown_start_of_token_invisible_unicode() {
   Test::new()
     .justfile(
       "
-\u{200b}foo := 'bar'
+        \u{200b}foo := 'bar'
       ",
     )
     .stderr(
       "
-error: Unknown start of token '\u{200b}' (U+200B)
- ——▶ justfile:1:1
-  │
-1 │ \u{200b}foo := 'bar'
-  │ ^
-",
+        error: Unknown start of token '\u{200b}' (U+200B)
+         ——▶ justfile:1:1
+          │
+        1 │ \u{200b}foo := 'bar'
+          │ ^
+      ",
     )
     .failure();
 }
@@ -2155,17 +2163,17 @@ fn unknown_start_of_token_ascii_control_char() {
   Test::new()
     .justfile(
       "
-\0foo := 'bar'
-",
+        \0foo := 'bar'
+      ",
     )
     .stderr(
       "
-error: Unknown start of token '\0' (U+0000)
- ——▶ justfile:1:1
-  │
-1 │ \0foo := 'bar'
-  │ ^
-",
+        error: Unknown start of token '\0' (U+0000)
+         ——▶ justfile:1:1
+          │
+        1 │ \0foo := 'bar'
+          │ ^
+      ",
     )
     .failure();
 }
@@ -2175,11 +2183,11 @@ fn backtick_variable_cat() {
   Test::new()
     .justfile(
       "
-stdin := `cat`
+        stdin := `cat`
 
-default:
-  echo {{stdin}}
-",
+        default:
+          echo {{stdin}}
+      ",
     )
     .stdin("STDIN")
     .stdout("STDIN\n")
@@ -2192,9 +2200,9 @@ fn backtick_default_cat_stdin() {
   Test::new()
     .justfile(
       "
-default stdin = `cat`:
-  echo {{stdin}}
-",
+        default stdin = `cat`:
+          echo {{stdin}}
+      ",
     )
     .stdin("STDIN")
     .stdout("STDIN\n")
@@ -2207,21 +2215,21 @@ fn backtick_default_cat_justfile() {
   Test::new()
     .justfile(
       "
-    default stdin = `cat justfile`:
-      echo '{{stdin}}'
-  ",
+        default stdin = `cat justfile`:
+          echo '{{stdin}}'
+      ",
     )
     .stdout(
       "
-    default stdin = `cat justfile`:
-      echo {{stdin}}
-  ",
+        default stdin = `cat justfile`:
+          echo {{stdin}}
+      ",
     )
     .stderr(
       "
-    echo 'default stdin = `cat justfile`:
-      echo '{{stdin}}''
-  ",
+        echo 'default stdin = `cat justfile`:
+          echo '{{stdin}}''
+      ",
     )
     .success();
 }
@@ -2231,11 +2239,11 @@ fn backtick_variable_read_single() {
   Test::new()
     .justfile(
       "
-password := `read PW && echo $PW`
+        password := `read PW && echo $PW`
 
-default:
-  echo {{password}}
-",
+        default:
+          echo {{password}}
+      ",
     )
     .stdin("foobar\n")
     .stdout("foobar\n")
@@ -2248,13 +2256,13 @@ fn backtick_variable_read_multiple() {
   Test::new()
     .justfile(
       "
-a := `read A && echo $A`
-b := `read B && echo $B`
+        a := `read A && echo $A`
+        b := `read B && echo $B`
 
-default:
-  echo {{a}}
-  echo {{b}}
-",
+        default:
+          echo {{a}}
+          echo {{b}}
+      ",
     )
     .stdin("foo\nbar\n")
     .stdout("foo\nbar\n")
@@ -2268,10 +2276,10 @@ fn backtick_default_read_multiple() {
     .justfile(
       "
 
-default a=`read A && echo $A` b=`read B && echo $B`:
-  echo {{a}}
-  echo {{b}}
-",
+        default a=`read A && echo $A` b=`read B && echo $B`:
+          echo {{a}}
+          echo {{b}}
+      ",
     )
     .stdin("foo\nbar\n")
     .stdout("foo\nbar\n")
@@ -2284,20 +2292,20 @@ fn old_equals_assignment_syntax_produces_error() {
   Test::new()
     .justfile(
       "
-    foo = 'bar'
+        foo = 'bar'
 
-    default:
-      echo {{foo}}
-  ",
+        default:
+          echo {{foo}}
+      ",
     )
     .stderr(
       "
-    error: Expected '*', ':', '$', identifier, or '+', but found '='
-     ——▶ justfile:1:5
-      │
-    1 │ foo = 'bar'
-      │     ^
-    ",
+        error: Expected '*', ':', '$', identifier, or '+', but found '='
+         ——▶ justfile:1:5
+          │
+        1 │ foo = 'bar'
+          │     ^
+      ",
     )
     .failure();
 }
@@ -2307,11 +2315,11 @@ fn dependency_argument_string() {
   Test::new()
     .justfile(
       "
-    release: (build 'foo') (build 'bar')
+        release: (build 'foo') (build 'bar')
 
-    build target:
-      echo 'Building {{target}}...'
-  ",
+        build target:
+          echo 'Building {{target}}...'
+      ",
     )
     .stdout("Building foo...\nBuilding bar...\n")
     .stderr("echo 'Building foo...'\necho 'Building bar...'\n")
@@ -2324,13 +2332,13 @@ fn dependency_argument_parameter() {
   Test::new()
     .justfile(
       "
-    default: (release '1.0')
+        default: (release '1.0')
 
-    release version: (build 'foo' version) (build 'bar' version)
+        release version: (build 'foo' version) (build 'bar' version)
 
-    build target version:
-      echo 'Building {{target}}@{{version}}...'
-  ",
+        build target version:
+          echo 'Building {{target}}@{{version}}...'
+      ",
     )
     .stdout("Building foo@1.0...\nBuilding bar@1.0...\n")
     .stderr("echo 'Building foo@1.0...'\necho 'Building bar@1.0...'\n")
@@ -2343,11 +2351,11 @@ fn dependency_argument_function() {
   Test::new()
     .justfile(
       "
-    foo: (bar env_var_or_default('x', 'y'))
+        foo: (bar env_var_or_default('x', 'y'))
 
-    bar arg:
-      echo {{arg}}
-  ",
+        bar arg:
+          echo {{arg}}
+      ",
     )
     .stdout("y\n")
     .stderr("echo y\n")
@@ -2361,11 +2369,11 @@ fn env_function_as_env_var() {
     .env("x", "z")
     .justfile(
       "
-    foo: (bar env('x'))
+        foo: (bar env('x'))
 
-    bar arg:
-      echo {{arg}}
-  ",
+        bar arg:
+          echo {{arg}}
+      ",
     )
     .stdout("z\n")
     .stderr("echo z\n")
@@ -2379,11 +2387,11 @@ fn env_function_as_env_var_or_default() {
     .env("x", "z")
     .justfile(
       "
-    foo: (bar env('x', 'y'))
+        foo: (bar env('x', 'y'))
 
-    bar arg:
-      echo {{arg}}
-  ",
+        bar arg:
+          echo {{arg}}
+      ",
     )
     .stdout("z\n")
     .stderr("echo z\n")
@@ -2397,11 +2405,11 @@ fn env_function_as_env_var_with_existing_env_var() {
     .env("x", "z")
     .justfile(
       "
-    foo: (bar env('x'))
+        foo: (bar env('x'))
 
-    bar arg:
-      echo {{arg}}
-  ",
+        bar arg:
+          echo {{arg}}
+      ",
     )
     .stdout("z\n")
     .stderr("echo z\n")
@@ -2415,11 +2423,11 @@ fn env_function_as_env_var_or_default_with_existing_env_var() {
     .env("x", "z")
     .justfile(
       "
-    foo: (bar env('x', 'y'))
+        foo: (bar env('x', 'y'))
 
-    bar arg:
-      echo {{arg}}
-  ",
+        bar arg:
+          echo {{arg}}
+      ",
     )
     .stdout("z\n")
     .stderr("echo z\n")
@@ -2432,14 +2440,14 @@ fn dependency_argument_backtick() {
   Test::new()
     .justfile(
       "
-    export X := 'X'
+        export X := 'X'
 
-    foo: (bar `echo $X`)
+        foo: (bar `echo $X`)
 
-    bar arg:
-      echo {{arg}}
-      echo $X
-  ",
+        bar arg:
+          echo {{arg}}
+          echo $X
+      ",
     )
     .stdout("X\nX\n")
     .stderr("echo X\necho $X\n")
@@ -2452,13 +2460,13 @@ fn dependency_argument_assignment() {
   Test::new()
     .justfile(
       "
-    v := '1.0'
+        v := '1.0'
 
-    default: (release v)
+        default: (release v)
 
-    release version:
-      echo Release {{version}}...
-  ",
+        release version:
+          echo Release {{version}}...
+      ",
     )
     .stdout("Release 1.0...\n")
     .stderr("echo Release 1.0...\n")
@@ -2471,11 +2479,11 @@ fn dependency_argument_plus_variadic() {
   Test::new()
     .justfile(
       "
-    foo: (bar 'A' 'B' 'C')
+        foo: (bar 'A' 'B' 'C')
 
-    bar +args:
-      echo {{args}}
-  ",
+        bar +args:
+          echo {{args}}
+      ",
     )
     .stdout("A B C\n")
     .stderr("echo A B C\n")
@@ -2488,11 +2496,11 @@ fn duplicate_dependency_no_args() {
   Test::new()
     .justfile(
       "
-    foo: bar bar bar bar
+        foo: bar bar bar bar
 
-    bar:
-      echo BAR
-  ",
+        bar:
+          echo BAR
+      ",
     )
     .stdout("BAR\n")
     .stderr("echo BAR\n")
@@ -2505,11 +2513,11 @@ fn duplicate_dependency_argument() {
   Test::new()
     .justfile(
       "
-    foo: (bar 'BAR') (bar `echo BAR`)
+        foo: (bar 'BAR') (bar `echo BAR`)
 
-    bar bar:
-      echo {{bar}}
-  ",
+        bar bar:
+          echo {{bar}}
+      ",
     )
     .stdout("BAR\n")
     .stderr("echo BAR\n")
@@ -2524,12 +2532,12 @@ fn pwsh_invocation_directory() {
   }
   Test::new()
     .justfile(
-      r#"
-    set shell := ["pwsh", "-NoProfile", "-c"]
+      "
+        set shell := ['pwsh', '-NoProfile', '-c']
 
-    pwd:
-      @Test-Path {{invocation_directory()}} > result.txt
-  "#,
+        pwd:
+          @Test-Path {{invocation_directory()}} > result.txt
+      ",
     )
     .shell(false)
     .success();
@@ -2541,9 +2549,9 @@ fn variables() {
     .arg("--variables")
     .justfile(
       "
-    z := 'a'
-    a := 'z'
-  ",
+        z := 'a'
+        a := 'z'
+      ",
     )
     .stdout("a z\n")
     .shell(false)
@@ -2554,16 +2562,16 @@ fn variables() {
 fn interpolation_evaluation_ignore_quiet() {
   Test::new()
     .justfile(
-      r#"
-    foo:
-      {{"@echo foo 2>/dev/null"}}
-  "#,
+      "
+        foo:
+          {{'@echo foo 2>/dev/null'}}
+      ",
     )
     .stderr(
       "
-    @echo foo 2>/dev/null
-    error: Recipe `foo` failed on line 2 with exit code 127
-  ",
+        @echo foo 2>/dev/null
+        error: Recipe `foo` failed on line 2 with exit code 127
+      ",
     )
     .shell(false)
     .status(127);
@@ -2574,16 +2582,16 @@ fn interpolation_evaluation_ignore_quiet_continuation() {
   Test::new()
     .justfile(
       r#"
-    foo:
-      {{""}}\
-      @echo foo 2>/dev/null
-  "#,
+        foo:
+          {{""}}\
+          @echo foo 2>/dev/null
+      "#,
     )
     .stderr(
       "
-    @echo foo 2>/dev/null
-    error: Recipe `foo` failed on line 3 with exit code 127
-  ",
+        @echo foo 2>/dev/null
+        error: Recipe `foo` failed on line 3 with exit code 127
+      ",
     )
     .shell(false)
     .status(127);
@@ -2594,15 +2602,15 @@ fn brace_escape() {
   Test::new()
     .justfile(
       "
-    foo:
-      echo '{{{{'
-  ",
+        foo:
+          echo '{{{{'
+      ",
     )
     .stdout("{{\n")
     .stderr(
       "
-    echo '{{'
-  ",
+        echo '{{'
+      ",
     )
     .success();
 }
@@ -2612,15 +2620,15 @@ fn brace_escape_extra() {
   Test::new()
     .justfile(
       "
-    foo:
-      echo '{{{{{'
-  ",
+        foo:
+          echo '{{{{{'
+      ",
     )
     .stdout("{{{\n")
     .stderr(
       "
-    echo '{{{'
-  ",
+        echo '{{{'
+      ",
     )
     .success();
 }
@@ -2630,12 +2638,12 @@ fn multi_line_string_in_interpolation() {
   Test::new()
     .justfile(
       "
-    foo:
-      echo {{'a
-      echo b
-      echo c'}}z
-      echo baz
-  ",
+        foo:
+          echo {{'a
+          echo b
+          echo c'}}z
+          echo baz
+      ",
     )
     .stdout("a\nb\ncz\nbaz\n")
     .stderr("echo a\n  echo b\n  echo cz\necho baz\n")
@@ -2649,12 +2657,12 @@ fn windows_interpreter_path_no_base() {
   }
   Test::new()
     .justfile(
-      r"
-    foo:
-      #!powershell
+      "
+        foo:
+          #!powershell
 
-      exit 0
-  ",
+          exit 0
+      ",
     )
     .success();
 }

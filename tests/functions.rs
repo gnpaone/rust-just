@@ -127,7 +127,7 @@ fn path_functions2() {
   }
   Test::new()
     .justfile(
-      r"
+      "
         we  := without_extension('/foo/bar/baz')
         fs  := file_stem('/foo/bar/baz.hello.ciao')
         fn  := file_name('/bar/baz.hello.ciao')
@@ -631,9 +631,9 @@ fn capitalize() {
   Test::new()
     .justfile(
       "
-      foo:
-        echo {{ capitalize('BAR') }}
-    ",
+        foo:
+          echo {{ capitalize('BAR') }}
+      ",
     )
     .stdout("Bar\n")
     .stderr("echo Bar\n")
@@ -645,10 +645,10 @@ fn semver_matches() {
   Test::new()
     .justfile(
       "
-      foo:
-        echo {{ semver_matches('0.1.0', '>=0.1.0') }}
-        echo {{ semver_matches('0.1.0', '=0.0.1') }}
-    ",
+        foo:
+          echo {{ semver_matches('0.1.0', '>=0.1.0') }}
+          echo {{ semver_matches('0.1.0', '=0.0.1') }}
+      ",
     )
     .stdout("true\nfalse\n")
     .stderr("echo true\necho false\n")
@@ -762,11 +762,11 @@ fn join_argument_count_error() {
     .args(["--evaluate"])
     .stderr(
       "
-      error: Function `join` called with 1 argument but takes 2 or more
-       ——▶ justfile:1:6
-        │
-      1 │ x := join(\'a\')
-        │      ^^^^
+        error: Function `join` called with 1 argument but takes 2 or more
+         ——▶ justfile:1:6
+          │
+        1 │ x := join(\'a\')
+          │      ^^^^
       ",
     )
     .failure();
@@ -800,12 +800,12 @@ fn error_errors_with_message() {
     .args(["--evaluate"])
     .stderr(
       "
-      error: Call to function `error` failed: Thing Not Supported
-       ——▶ justfile:1:6
-        │
-      1 │ x := error ('Thing Not Supported')
-        │      ^^^^^
-    ",
+        error: Call to function `error` failed: Thing Not Supported
+         ——▶ justfile:1:6
+          │
+        1 │ x := error ('Thing Not Supported')
+          │      ^^^^^
+      ",
     )
     .failure();
 }
@@ -885,7 +885,7 @@ fn uuid() {
 #[test]
 fn choose() {
   Test::new()
-    .justfile(r"x := choose('10', 'xXyYzZ')")
+    .justfile("x := choose('10', 'xXyYzZ')")
     .args(["--evaluate", "x"])
     .stdout_regex("^[X-Zx-z]{10}$")
     .success();
@@ -898,12 +898,12 @@ fn choose_bad_alphabet_empty() {
     .args(["--evaluate"])
     .stderr(
       "
-      error: Call to function `choose` failed: empty alphabet
-       ——▶ justfile:1:6
-        │
-      1 │ x := choose('10', '')
-        │      ^^^^^^
-    ",
+        error: Call to function `choose` failed: empty alphabet
+         ——▶ justfile:1:6
+          │
+        1 │ x := choose('10', '')
+          │      ^^^^^^
+      ",
     )
     .failure();
 }
@@ -915,12 +915,12 @@ fn choose_bad_alphabet_repeated() {
     .args(["--evaluate"])
     .stderr(
       "
-      error: Call to function `choose` failed: alphabet contains repeated character `a`
-       ——▶ justfile:1:6
-        │
-      1 │ x := choose('10', 'aa')
-        │      ^^^^^^
-    ",
+        error: Call to function `choose` failed: alphabet contains repeated character `a`
+         ——▶ justfile:1:6
+          │
+        1 │ x := choose('10', 'aa')
+          │      ^^^^^^
+      ",
     )
     .failure();
 }
@@ -932,12 +932,12 @@ fn choose_bad_length() {
     .args(["--evaluate"])
     .stderr(
       "
-      error: Call to function `choose` failed: failed to parse `foo` as positive integer: invalid digit found in string
-       ——▶ justfile:1:6
-        │
-      1 │ x := choose('foo', HEX)
-        │      ^^^^^^
-    ",
+        error: Call to function `choose` failed: failed to parse `foo` as positive integer: invalid digit found in string
+         ——▶ justfile:1:6
+          │
+        1 │ x := choose('foo', HEX)
+          │      ^^^^^^
+      ",
     )
     .failure();
 }
@@ -984,11 +984,11 @@ fn shell_no_argument() {
     .args(["--evaluate"])
     .stderr(
       "
-      error: Function `shell` called with 0 arguments but takes 1 or more
-       ——▶ justfile:1:8
-        │
-      1 │ var := shell()
-        │        ^^^^^
+        error: Function `shell` called with 0 arguments but takes 1 or more
+         ——▶ justfile:1:8
+          │
+        1 │ var := shell()
+          │        ^^^^^
       ",
     )
     .failure();
@@ -1016,11 +1016,11 @@ fn shell_error() {
     .args(["--evaluate"])
     .stderr(
       "
-      error: Call to function `shell` failed: Process exited with status code 1
-       ——▶ justfile:1:8
-        │
-      1 │ var := shell('exit 1')
-        │        ^^^^^
+        error: Call to function `shell` failed: Process exited with status code 1
+         ——▶ justfile:1:8
+          │
+        1 │ var := shell('exit 1')
+          │        ^^^^^
       ",
     )
     .failure();
@@ -1269,11 +1269,11 @@ fn unary_argument_count_mismatch_error_message() {
     .args(["--evaluate"])
     .stderr(
       "
-      error: Function `datetime` called with 0 arguments but takes 1
-       ——▶ justfile:1:6
-        │
-      1 │ x := datetime()
-        │      ^^^^^^^^
+        error: Function `datetime` called with 0 arguments but takes 1
+         ——▶ justfile:1:6
+          │
+        1 │ x := datetime()
+          │      ^^^^^^^^
       ",
     )
     .failure();
@@ -1284,12 +1284,12 @@ fn dir_abbreviations_are_accepted() {
   Test::new()
     .justfile(
       "
-      abbreviated := justfile_dir()
-      unabbreviated := justfile_directory()
+        abbreviated := justfile_dir()
+        unabbreviated := justfile_directory()
 
-      @foo:
-        # {{ assert(abbreviated == unabbreviated, 'fail') }}
-    ",
+        @foo:
+          # {{ assert(abbreviated == unabbreviated, 'fail') }}
+      ",
     )
     .success();
 }
@@ -1299,12 +1299,12 @@ fn invocation_dir_native_abbreviation_is_accepted() {
   Test::new()
     .justfile(
       "
-      abbreviated := invocation_directory_native()
-      unabbreviated := invocation_dir_native()
+        abbreviated := invocation_directory_native()
+        unabbreviated := invocation_dir_native()
 
-      @foo:
-        # {{ assert(abbreviated == unabbreviated, 'fail') }}
-    ",
+        @foo:
+          # {{ assert(abbreviated == unabbreviated, 'fail') }}
+      ",
     )
     .success();
 }
@@ -1398,10 +1398,10 @@ bar:
 fn style_command_default() {
   Test::new()
     .justfile(
-      r#"
+      "
         foo:
-          @echo '{{ style("command") }}foo{{NORMAL}}'
-      "#,
+          @echo '{{ style('command') }}foo{{NORMAL}}'
+      ",
     )
     .stdout("\x1b[1mfoo\x1b[0m\n")
     .success();
@@ -1411,10 +1411,10 @@ fn style_command_default() {
 fn style_command_non_default() {
   Test::new()
     .justfile(
-      r#"
+      "
         foo:
-          @echo '{{ style("command") }}foo{{NORMAL}}'
-      "#,
+          @echo '{{ style('command') }}foo{{NORMAL}}'
+      ",
     )
     .args(["--command-color", "red"])
     .stdout("\x1b[1;31mfoo\x1b[0m\n")
@@ -1425,10 +1425,10 @@ fn style_command_non_default() {
 fn style_error() {
   Test::new()
     .justfile(
-      r#"
+      "
         foo:
-          @echo '{{ style("error") }}foo{{NORMAL}}'
-      "#,
+          @echo '{{ style('error') }}foo{{NORMAL}}'
+      ",
     )
     .stdout("\x1b[1;31mfoo\x1b[0m\n")
     .success();
@@ -1438,10 +1438,10 @@ fn style_error() {
 fn style_warning() {
   Test::new()
     .justfile(
-      r#"
+      "
         foo:
-          @echo '{{ style("warning") }}foo{{NORMAL}}'
-      "#,
+          @echo '{{ style('warning') }}foo{{NORMAL}}'
+      ",
     )
     .stdout("\x1b[1;33mfoo\x1b[0m\n")
     .success();
@@ -1451,19 +1451,19 @@ fn style_warning() {
 fn style_unknown() {
   Test::new()
     .justfile(
-      r#"
+      "
         foo:
-          @echo '{{ style("hippo") }}foo{{NORMAL}}'
-      "#,
+          @echo '{{ style('hippo') }}foo{{NORMAL}}'
+      ",
     )
     .stderr(
-      r#"
+      "
         error: Call to function `style` failed: unknown style: `hippo`
          ——▶ justfile:2:13
           │
-        2 │   @echo '{{ style("hippo") }}foo{{NORMAL}}'
+        2 │   @echo '{{ style('hippo') }}foo{{NORMAL}}'
           │             ^^^^^
-      "#,
+      ",
     )
     .failure();
 }
@@ -1495,16 +1495,36 @@ fn shell_with_powershell() {
 
   Test::new()
     .justfile(
-      r#"
-      set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+      "
+        set windows-shell := ['pwsh.exe', '-NoLogo', '-Command']
 
-      foo := shell('Write-Output bar')
+        foo := shell('Write-Output bar')
 
-      default:
-        @echo {{foo}}
-    "#,
+        default:
+          @echo {{foo}}
+      ",
     )
     .shell(false)
     .stdout("bar\r\n")
+    .success();
+}
+
+#[test]
+fn module_path() {
+  Test::new()
+    .justfile("foo := module_path()")
+    .args(["--evaluate", "foo"])
+    .stdout("")
+    .success();
+}
+
+#[test]
+fn module_path_in_submodule() {
+  Test::new()
+    .write("foo.just", "mod bar")
+    .write("bar.just", "baz := module_path()")
+    .justfile("mod foo")
+    .args(["--evaluate", "foo::bar::baz"])
+    .stdout("foo::bar")
     .success();
 }

@@ -5,10 +5,10 @@ fn no_stdout() {
   Test::new()
     .arg("--quiet")
     .justfile(
-      r"
-default:
-  @echo hello
-",
+      "
+        default:
+          @echo hello
+      ",
     )
     .success();
 }
@@ -18,10 +18,10 @@ fn stderr() {
   Test::new()
     .arg("--quiet")
     .justfile(
-      r"
-default:
-  @echo hello 1>&2
-",
+      "
+        default:
+          @echo hello 1>&2
+      ",
     )
     .success();
 }
@@ -31,10 +31,10 @@ fn command_echoing() {
   Test::new()
     .arg("--quiet")
     .justfile(
-      r"
-default:
-  exit
-",
+      "
+        default:
+          exit
+      ",
     )
     .success();
 }
@@ -44,10 +44,10 @@ fn error_messages() {
   Test::new()
     .arg("--quiet")
     .justfile(
-      r"
-default:
-  exit 100
-",
+      "
+        default:
+          exit 100
+      ",
     )
     .status(100);
 }
@@ -57,11 +57,11 @@ fn assignment_backtick_stderr() {
   Test::new()
     .arg("--quiet")
     .justfile(
-      r"
-a := `echo hello 1>&2`
-default:
-  exit 100
-",
+      "
+        a := `echo hello 1>&2`
+        default:
+          exit 100
+      ",
     )
     .status(100);
 }
@@ -71,11 +71,11 @@ fn interpolation_backtick_stderr() {
   Test::new()
     .arg("--quiet")
     .justfile(
-      r"
-default:
-  echo `echo hello 1>&2`
-  exit 100
-",
+      "
+        default:
+          echo `echo hello 1>&2`
+          exit 100
+      ",
     )
     .status(100);
 }
@@ -157,9 +157,9 @@ fn quiet_shebang() {
     .arg("--quiet")
     .justfile(
       "
-    @foo:
-      #!/bin/sh
-  ",
+        @foo:
+          #!/bin/sh
+      ",
     )
     .success();
 }
@@ -183,10 +183,10 @@ fn quiet_setting() {
   Test::new()
     .justfile(
       "
-      set quiet
+        set quiet
 
-      foo:
-        echo FOO
+        foo:
+          echo FOO
       ",
     )
     .stdout("FOO\n")
@@ -198,11 +198,11 @@ fn quiet_setting_with_no_quiet_attribute() {
   Test::new()
     .justfile(
       "
-      set quiet
+        set quiet
 
-      [no-quiet]
-      foo:
-        echo FOO
+        [no-quiet]
+        foo:
+          echo FOO
       ",
     )
     .stdout("FOO\n")
@@ -215,10 +215,10 @@ fn quiet_setting_with_quiet_recipe() {
   Test::new()
     .justfile(
       "
-      set quiet
+        set quiet
 
-      @foo:
-        echo FOO
+        @foo:
+          echo FOO
       ",
     )
     .stdout("FOO\n")
@@ -230,10 +230,10 @@ fn quiet_setting_with_quiet_line() {
   Test::new()
     .justfile(
       "
-      set quiet
+        set quiet
 
-      foo:
-        @echo FOO
+        foo:
+          @echo FOO
       ",
     )
     .stdout("FOO\n")
@@ -245,11 +245,11 @@ fn quiet_setting_with_no_quiet_attribute_and_quiet_recipe() {
   Test::new()
     .justfile(
       "
-      set quiet
+        set quiet
 
-      [no-quiet]
-      @foo:
-        echo FOO
+        [no-quiet]
+        @foo:
+          echo FOO
       ",
     )
     .stdout("FOO\n")
@@ -261,11 +261,11 @@ fn quiet_setting_with_no_quiet_attribute_and_quiet_line() {
   Test::new()
     .justfile(
       "
-      set quiet
+        set quiet
 
-      [no-quiet]
-      foo:
-        @echo FOO
+        [no-quiet]
+        foo:
+          @echo FOO
       ",
     )
     .stdout("FOO\n")
