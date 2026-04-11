@@ -356,6 +356,23 @@ fn aliases_completed_with_flag() {
 }
 
 #[test]
+fn aliases_completed_with_environment_variable() {
+  Test::new()
+    .justfile(
+      "
+        foo:
+        alias b := foo
+      ",
+    )
+    .shell(false)
+    .env("JUST_COMPLETE", "fish")
+    .env("JUST_COMPLETE_ALIASES", "true")
+    .args(complete_args(&[""]))
+    .stdout_regex("foo\nb\n--.*")
+    .success();
+}
+
+#[test]
 fn private_aliases_excluded() {
   Test::new()
     .justfile(
@@ -401,5 +418,22 @@ fn usage_recipes() {
     .env("JUST_COMPLETE", "fish")
     .args(complete_args(&["--usage", ""]))
     .stdout("bar\nfoo\n")
+    .success();
+}
+
+#[test]
+fn recipes_with_invalid_config() {
+  Test::new()
+    .justfile(
+      "
+        foo:
+        bar:
+      ",
+    )
+    .shell(false)
+    .env("JUST_COMPLETE", "fish")
+    .env("JUST_ALIAS_STYLE", "foo")
+    .args(complete_args(&[""]))
+    .stdout_regex("bar\nfoo\n--.*")
     .success();
 }
