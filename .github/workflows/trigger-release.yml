@@ -33,7 +33,7 @@ jobs:
       - run: npm install semver
 
       - name: Check for new release
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         id: rel-chk
         with:
           script: |
@@ -51,7 +51,7 @@ jobs:
     steps:
       - name: Fetch source release data
         id: src_rel
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const { data } = await github.rest.repos.getReleaseByTag({
