@@ -122,7 +122,11 @@ jobs:
           set -e
           if [ $STATUS -ne 0 ]; then
             echo "OIDC publish failed."
-            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+            if [ -z "$NPM_TOKEN" ]; then
+              echo "ERROR: NPM_TOKEN is empty"
+              exit 1
+            fi
+            npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
             npm publish --access public
           fi
 
