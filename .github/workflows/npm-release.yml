@@ -89,8 +89,6 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - name: Publish to NPM
         shell: bash
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd npm
           bin="just"
@@ -112,23 +110,7 @@ jobs:
           cp "../target/${{ matrix.TARGET }}/release/${bin}" "${node_pkg}/bin"
           cp ./README.md "${node_pkg}"
           cd "${node_pkg}"
-          if npm view "${node_pkg}@${version}" >/dev/null 2>&1; then
-            echo "Skipping ${node_pkg}@${version} (already published)"
-            exit 0
-          fi
-          set +e
           npm publish --access public
-          STATUS=$?
-          set -e
-          if [ $STATUS -ne 0 ]; then
-            echo "OIDC publish failed."
-            if [ -z "$NPM_TOKEN" ]; then
-              echo "ERROR: NPM_TOKEN is empty"
-              exit 1
-            fi
-            npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-            npm publish --access public
-          fi
 
   publish-base:
     name: Publish base package
