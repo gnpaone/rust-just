@@ -6,7 +6,7 @@ on:
     branches:
       - master
     paths:
-      - '**/Cargo.toml'
+      - 'Cargo.toml'
 
 jobs:
   check:
