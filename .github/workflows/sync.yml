@@ -24,6 +24,15 @@ jobs:
           rm -rf ./.sync-repo/.git  
           rsync -av --checksum --exclude='.github/' ./.sync-repo/ .
           rm -rf ./.sync-repo/
+
+      - name: Check version change
+        id: version_check
+        run: |
+          if git diff HEAD -- Cargo.toml | grep -E '^\+version = ' >/dev/null; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
   
       - name: Create PR
         id: cpr
@@ -84,4 +93,9 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           numbers: ${{ steps.cpr.outputs.pull-request-number }}
-          
+
+      - name: Trigger release workflow
+        if: steps.version_check.outputs.changed == 'true'
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          event-type: trigger-release
