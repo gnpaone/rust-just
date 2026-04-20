@@ -207,6 +207,7 @@ jobs:
         env:
           UV_PUBLISH_TOKEN: ${{ vars.USE_TESTPYPI == 'true' && secrets.TESTPYPI_API_TOKEN || secrets.PYPI_API_TOKEN }}
         run: |
+          rm -f pypi/dist/rust_just-1.50.0-py3-none-musllinux_1_2_riscv64.whl
           if [ "${{ vars.USE_TESTPYPI }}" == "true" ]; then
             uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple/ pypi/dist/*
           else
