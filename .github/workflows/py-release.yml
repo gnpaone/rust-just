@@ -210,5 +210,5 @@ jobs:
           if [ "${{ vars.USE_TESTPYPI }}" == "true" ]; then
             uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple/ pypi/dist/*
           else
-            uv publish pypi/dist/* --skip-existing
+            uv publish --check-url https://pypi.org/simple/ pypi/dist/*
           fi
