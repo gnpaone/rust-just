@@ -2347,7 +2347,7 @@ change their behavior.
 | `[exit-message]`<sup>1.39.0</sup> | recipe | Print error message if recipe fails regardless of `set no-exit-message`. |
 | `[freebsd]`<sup>1.47.0</sup> | recipe | Enable recipe on FreeBSD. |
 | `[group(NAME)]`<sup>1.27.0</sup> | module, recipe | Put recipe or module in [group](#groups) `NAME`. |
-| `[android]`<sup>1.50.0</sup> | recipe | Enable recipe on Android. |
+| `[android]`<sup>master</sup> | recipe | Enable recipe on Android. |
 | `[linux]`<sup>1.8.0</sup> | recipe | Enable recipe on Linux. |
 | `[macos]`<sup>1.8.0</sup> | recipe | Enable recipe on macOS. |
 | `[metadata(METADATA)]`<sup>1.42.0</sup> | recipe | Attach `METADATA` to recipe. |
@@ -4283,7 +4283,7 @@ Each `justfile` has a canonical formatting with respect to whitespace and
 newlines.
 
 You can overwrite the current justfile with a canonically-formatted version
-using the `--fmt` flag:
+using the currently-unstable `--fmt` flag:
 
 ```console
 $ cat justfile
@@ -4295,7 +4295,7 @@ $ cat justfile
 
 some-recipe:
   echo "foo"
-$ just --fmt
+$ just --fmt --unstable
 $ cat justfile
 # A lot of blank lines
 
@@ -4303,10 +4303,7 @@ some-recipe:
     echo "foo"
 ```
 
-Note that formatting is not covered by any backwards compatibility guarantee
-and is subject to change from time to time.
-
-Invoking `just --fmt --check` runs `--fmt` in check mode. Instead of
+Invoking `just --fmt --check --unstable` runs `--fmt` in check mode. Instead of
 overwriting the `justfile`, `just` will exit with an exit code of 0 if it is
 formatted correctly, and will exit with 1 and print a diff if it is not.
 

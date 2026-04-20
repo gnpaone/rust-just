@@ -83,7 +83,7 @@ fn skip_private_recipes() {
 #[test]
 fn recipes_in_submodules_can_be_chosen() {
   Test::new()
-    .arg("--choose")
+    .args(["--unstable", "--choose"])
     .env("JUST_CHOOSER", "head -n10")
     .write("bar.just", "baz:\n echo BAZ")
     .justfile(
@@ -243,25 +243,6 @@ fn cancelled_by_user() {
   assert!(output.stderr.is_empty());
 
   assert!(output.status.success());
-}
-
-#[test]
-fn filter_by_group() {
-  Test::new()
-    .args(["--choose", "--chooser", "head -n1", "--group", "foo"])
-    .justfile(
-      "
-        a:
-          echo A
-
-        [group: 'foo']
-        b:
-          echo B
-      ",
-    )
-    .stderr("echo B\n")
-    .stdout("B\n")
-    .success();
 }
 
 #[test]

@@ -221,14 +221,15 @@ impl Subcommand {
     overrides: &HashMap<Number, String>,
     search: &Search,
   ) -> RunResult<'src> {
-    let groups = config.groups.iter().cloned().collect::<BTreeSet<String>>();
     let mut recipes = Vec::<&Recipe>::new();
     let mut stack = vec![justfile];
     while let Some(module) = stack.pop() {
-      recipes.extend(module.public_recipes(config).iter().filter(|recipe| {
-        recipe.min_arguments() == 0
-          && (groups.is_empty() || groups.intersection(&recipe.groups()).next().is_some())
-      }));
+      recipes.extend(
+        module
+          .public_recipes(config)
+          .iter()
+          .filter(|recipe| recipe.min_arguments() == 0),
+      );
       stack.extend(module.modules.values());
     }
 
@@ -359,6 +360,23 @@ impl Subcommand {
       &Source::root(&search.justfile),
       src,
     )?;
+
+    let unstable = config.unstable
+      || ast.items.iter().any(|item| {
+        matches!(
+          item,
+          Item::Set(Set {
+            value: Setting::Unstable(true),
+            ..
+          })
+        )
+      });
+
+    if !unstable {
+      return Err(Error::UnstableFeature {
+        unstable_feature: UnstableFeature::FormatSubcommand,
+      });
+    }
 
     let formatted = ast
       .color_display(config.color.use_color(UseColor::Never))
