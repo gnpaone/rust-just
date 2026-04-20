@@ -2,11 +2,8 @@ name: Trigger release
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - master
-    paths:
-      - 'Cargo.toml'
+  repository_dispatch:
+    types: [trigger-release]
 
 jobs:
   check:
