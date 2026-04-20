@@ -10,7 +10,7 @@ import { arch as getArch, platform as getPlatform } from "os";
  */
 export async function getExePath() {
   const platform = getPlatform();
-  const arch = getArch();
+  let arch = getArch();
 
   let os = platform as string;
   let extension = "";
