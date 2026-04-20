@@ -65,7 +65,7 @@ jobs:
     strategy:
       matrix:
         runner: [ubuntu-latest]
-        target: [x86_64, x86, aarch64, armv7, riscv64, loongarch64]
+        target: [x86_64, x86, aarch64, armv7, riscv64] # loongarch64 excluded for now as pypi has no support
     steps:
       - uses: actions/checkout@v6
         with:
@@ -210,5 +210,5 @@ jobs:
           if [ "${{ vars.USE_TESTPYPI }}" == "true" ]; then
             uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple/ pypi/dist/*
           else
-            uv publish pypi/dist/*
+            uv publish pypi/dist/* --skip-existing
           fi
