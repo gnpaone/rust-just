@@ -67,21 +67,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-      - name: Download release artifact
+      - name: Download & Extract release artifact
         uses: robinraju/release-downloader@v1.13
         with:
           tag: ${{ needs.find-latest-tag.outputs.tag }}
           fileName: just-${{ needs.find-latest-tag.outputs.tag }}-${{ matrix.TARGET }}.*
           out-file-path: './release'
-      - name: Extract and Copy Binary
-        shell: bash
-        run: |
-          mkdir -p ./target/${{ matrix.TARGET }}/release
-          if [[ ${{ matrix.OS }} == 'windows-2022' ]]; then
-            unzip ./release/just-${{ needs.find-latest-tag.outputs.tag }}-${{ matrix.TARGET }}.zip -d ./target/${{ matrix.TARGET }}/release/
-          else
-            tar -xzf ./release/just-${{ needs.find-latest-tag.outputs.tag }}-${{ matrix.TARGET }}.tar.gz -C ./target/${{ matrix.TARGET }}/release/
-          fi
+          extract: true
+          extract-path: './target/${{ matrix.TARGET }}/release'
       - name: Install Node.js
         uses: actions/setup-node@v6
         with:
