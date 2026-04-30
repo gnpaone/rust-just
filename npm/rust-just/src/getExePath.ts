@@ -1,4 +1,4 @@
-import { arch as getArch, platform as getPlatform } from "os";
+import { arch as getArch, platform as getPlatform, machine as getMachine } from "os";
 
 /**
  * Returns the executable path for just located inside node_modules
@@ -10,7 +10,7 @@ import { arch as getArch, platform as getPlatform } from "os";
  */
 export async function getExePath() {
   const platform = getPlatform();
-  let arch = getArch();
+  let arch: string = getArch();
 
   let os = platform as string;
   let extension = "";
@@ -22,7 +22,8 @@ export async function getExePath() {
 
   if (arch === "arm") {
     const armVersion = (process as any).config?.variables?.arm_version;
-    if (armVersion === "7" || armVersion === 7) {
+    const machine = typeof getMachine === "function" ? getMachine() : "";
+    if (armVersion === "7" || armVersion === 7 || machine.includes("armv7")) {
       arch = "armv7";
     }
   }
