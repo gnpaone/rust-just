@@ -39,7 +39,7 @@ async function run() {
     reject: false,
     ...(argv.execaoptions || {}),
   };
-  
+
   const processResult = await execa(fileURLToPath(exePath), args, execaOptions);
 
   process.exit(processResult.exitCode ?? 0);
