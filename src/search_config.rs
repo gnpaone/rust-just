@@ -10,6 +10,8 @@ pub(crate) enum SearchConfig {
   FromInvocationDirectory,
   /// As in `Invocation`, but start from `search_directory`.
   FromSearchDirectory { search_directory: PathBuf },
+  /// Read justfile from standard input
+  FromStandardInput { working_directory: Option<PathBuf> },
   /// Search for global justfile
   GlobalJustfile,
   /// Use user-specified justfile, with the working directory set to the
