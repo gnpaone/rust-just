@@ -46,14 +46,13 @@ impl<'src, D> Recipe<'src, D> {
       && !netbsd
       && !unix
       && !android)
-      || (cfg!(target_os = "android") && (android || unix))
-      || (cfg!(target_os = "dragonfly") && (dragonfly || unix))
-      || (cfg!(target_os = "freebsd") && (freebsd || unix))
-      || (cfg!(target_os = "linux") && (linux || unix))
-      || (cfg!(target_os = "macos") && (macos || unix))
-      || (cfg!(target_os = "netbsd") && (netbsd || unix))
-      || (cfg!(target_os = "openbsd") && (openbsd || unix))
-      || (cfg!(target_os = "windows") && windows)
+      || (cfg!(target_os = "android") && android)
+      || (cfg!(target_os = "dragonfly") && dragonfly)
+      || (cfg!(target_os = "freebsd") && freebsd)
+      || (cfg!(target_os = "linux") && linux)
+      || (cfg!(target_os = "macos") && macos)
+      || (cfg!(target_os = "netbsd") && netbsd)
+      || (cfg!(target_os = "openbsd") && openbsd)
       || (cfg!(unix) && unix)
       || (cfg!(windows) && windows)
   }
@@ -196,20 +195,26 @@ impl<'src> Recipe<'src> {
     }
   }
 
-  fn working_directory<'a>(&'a self, context: &'a ExecutionContext) -> Option<PathBuf> {
+  fn working_directory<'a, 'run>(
+    &'a self,
+    context: &'a ExecutionContext,
+    evaluator: &mut Evaluator<'src, 'run>,
+  ) -> RunResult<'src, Option<PathBuf>> {
     if !self.change_directory(&context.module.settings) {
-      return None;
+      return Ok(None);
     }
 
     let working_directory = context.working_directory();
 
     for attribute in &self.attributes {
-      if let Attribute::WorkingDirectory(dir) = attribute {
-        return Some(working_directory.join(&dir.cooked));
+      if let Attribute::WorkingDirectory(expression) = attribute {
+        return Ok(Some(
+          working_directory.join(&evaluator.evaluate_expression(expression)?),
+        ));
       }
     }
 
-    Some(working_directory)
+    Ok(Some(working_directory))
   }
 
   fn no_quiet(&self) -> bool {
@@ -219,9 +224,10 @@ impl<'src> Recipe<'src> {
   pub(crate) fn run<'run>(
     &self,
     context: &ExecutionContext<'src, 'run>,
-    scope: &Scope<'src, 'run>,
-    positional: &[String],
+    env: &BTreeMap<String, String>,
     is_dependency: bool,
+    positional: &[String],
+    scope: &Scope<'src, 'run>,
   ) -> RunResult<'src> {
     let color = context.config.color.stderr().banner();
     let prefix = color.prefix();
@@ -244,9 +250,9 @@ impl<'src> Recipe<'src> {
 
     let start = Instant::now();
     let result = if self.is_script() {
-      self.run_script(context, scope, positional, evaluator)
+      self.run_script(context, env, evaluator, positional, scope)
     } else {
-      self.run_linewise(context, scope, positional, evaluator)
+      self.run_linewise(context, env, evaluator, positional, scope)
     };
     let elapsed = start.elapsed();
 
@@ -274,15 +280,19 @@ impl<'src> Recipe<'src> {
   fn run_linewise<'run>(
     &self,
     context: &ExecutionContext<'src, 'run>,
-    scope: &Scope<'src, 'run>,
-    positional: &[String],
+    env: &BTreeMap<String, String>,
     mut evaluator: Evaluator<'src, 'run>,
+    positional: &[String],
+    scope: &Scope<'src, 'run>,
   ) -> RunResult<'src> {
     let config = &context.config;
     let settings = &context.module.settings;
 
     let mut lines = self.body.iter().peekable();
     let mut line_number = self.line_number() + 1;
+
+    let working_directory = self.working_directory(context, &mut evaluator)?;
+
     loop {
       let Some(line) = lines.peek() else {
         return Ok(());
@@ -354,7 +364,7 @@ impl<'src> Recipe<'src> {
 
       let mut cmd = settings.shell_command(config);
 
-      if let Some(working_directory) = self.working_directory(context) {
+      if let Some(working_directory) = &working_directory {
         cmd.current_dir(working_directory);
       }
 
@@ -372,10 +382,8 @@ impl<'src> Recipe<'src> {
 
       cmd.export(settings, context.dotenv, scope, &context.module.unexports);
 
-      for attribute in &self.attributes {
-        if let Attribute::Env(key, value) = attribute {
-          cmd.env(&key.cooked, &value.cooked);
-        }
+      for (key, value) in env {
+        cmd.env(key, value);
       }
 
       let (result, caught) = cmd.status_guard();
@@ -432,9 +440,10 @@ impl<'src> Recipe<'src> {
   pub(crate) fn run_script<'run>(
     &self,
     context: &ExecutionContext<'src, 'run>,
-    scope: &Scope<'src, 'run>,
-    positional: &[String],
+    env: &BTreeMap<String, String>,
     mut evaluator: Evaluator<'src, 'run>,
+    positional: &[String],
+    scope: &Scope<'src, 'run>,
   ) -> RunResult<'src> {
     let config = &context.config;
 
@@ -528,7 +537,7 @@ impl<'src> Recipe<'src> {
       config,
       &path,
       self.name(),
-      self.working_directory(context).as_deref(),
+      self.working_directory(context, &mut evaluator)?.as_deref(),
     )?;
 
     if self.takes_positional_arguments(&context.module.settings) {
@@ -542,10 +551,8 @@ impl<'src> Recipe<'src> {
       &context.module.unexports,
     );
 
-    for attribute in &self.attributes {
-      if let Attribute::Env(key, value) = attribute {
-        command.env(&key.cooked, &value.cooked);
-      }
+    for (key, value) in env {
+      command.env(key, value);
     }
 
     // run it!

@@ -548,20 +548,16 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     parameters: &[Parameter<'src>],
     recipe: &Recipe<'src>,
     scope: &'run Scope<'src, 'run>,
-  ) -> RunResult<'src, (Scope<'src, 'run>, Vec<String>)> {
-    let env = recipe
-      .attributes
-      .iter()
-      .filter_map(|attribute| {
-        if let Attribute::Env(key, value) = attribute {
-          Some((key.cooked.clone(), value.cooked.clone()))
-        } else {
-          None
-        }
-      })
-      .collect();
+  ) -> RunResult<'src, (Scope<'src, 'run>, Vec<String>, BTreeMap<String, String>)> {
+    let mut evaluator = Self::new(context, BTreeMap::new(), is_dependency, scope);
 
-    let mut evaluator = Self::new(context, env, is_dependency, scope);
+    for attribute in &recipe.attributes {
+      if let Attribute::Env(key, value) = attribute {
+        let key = evaluator.evaluate_expression(key)?;
+        let value = evaluator.evaluate_expression(value)?;
+        evaluator.env.insert(key, value);
+      }
+    }
 
     let mut positional = Vec::new();
 
@@ -610,7 +606,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
       });
     }
 
-    Ok((evaluator.scope, positional))
+    Ok((evaluator.scope, positional, evaluator.env))
   }
 
   pub(crate) fn new(

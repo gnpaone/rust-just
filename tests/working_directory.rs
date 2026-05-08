@@ -427,3 +427,97 @@ fn setting_and_attribute() {
     .expect_file("foo/bar/fred", "bob\n")
     .success();
 }
+
+#[test]
+fn attribute_with_expression() {
+  Test::new()
+    .justfile(
+      "
+        dir := 'foo'
+
+        [working-directory(dir + '-bar')]
+        @baz:
+          echo bob > fred
+      ",
+    )
+    .create_dir("foo-bar")
+    .expect_file("foo-bar/fred", "bob\n")
+    .success();
+}
+
+#[test]
+fn attribute_with_recipe_parameter() {
+  Test::new()
+    .justfile(
+      "
+        [working-directory(target)]
+        @baz target:
+          echo bob > fred
+      ",
+    )
+    .create_dir("foo")
+    .args(["baz", "foo"])
+    .expect_file("foo/fred", "bob\n")
+    .success();
+}
+
+#[test]
+fn attribute_with_backtick() {
+  Test::new()
+    .justfile(
+      "
+        [working-directory(`echo foo`)]
+        @baz:
+          echo bob > fred
+      ",
+    )
+    .create_dir("foo")
+    .expect_file("foo/fred", "bob\n")
+    .success();
+}
+
+#[test]
+fn attribute_with_expression_dump() {
+  Test::new()
+    .justfile(
+      "
+        dir := 'foo'
+
+        [working-directory(dir + '-bar')]
+        baz:
+          echo bob
+      ",
+    )
+    .arg("--dump")
+    .stdout(
+      "
+        dir := 'foo'
+
+        [working-directory(dir + '-bar')]
+        baz:
+            echo bob
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn attribute_undefined_variable() {
+  Test::new()
+    .justfile(
+      "
+        [working-directory(x)]
+        foo:
+      ",
+    )
+    .stderr(
+      "
+        error: variable `x` not defined
+         ——▶ justfile:1:20
+          │
+        1 │ [working-directory(x)]
+          │                    ^
+      ",
+    )
+    .failure();
+}
