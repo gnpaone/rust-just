@@ -44,7 +44,7 @@ impl<'src> Justfile<'src> {
     candidates: impl Iterator<Item = Suggestion<'src>>,
   ) -> Option<Suggestion<'src>> {
     candidates
-      .map(|suggestion| (edit_distance(input, suggestion.name), suggestion))
+      .map(|suggestion| (strsim::levenshtein(input, suggestion.name), suggestion))
       .filter(|(distance, _suggestion)| *distance < 3)
       .min_by_key(|(distance, _suggestion)| *distance)
       .map(|(_distance, suggestion)| suggestion)
@@ -386,7 +386,7 @@ impl<'src> Justfile<'src> {
   }
 
   pub(crate) fn check_unstable(&self, config: &Config) -> RunResult<'src> {
-    if let Some(&unstable_feature) = self.unstable_features.iter().next() {
+    if let Some(&unstable_feature) = self.unstable_features.first() {
       config.require_unstable(self, unstable_feature)?;
     }
 
@@ -447,7 +447,7 @@ impl<'src> Justfile<'src> {
       search,
     };
 
-    let (outer, positional) = Evaluator::evaluate_parameters(
+    let (outer, positional, env) = Evaluator::evaluate_parameters(
       arguments,
       &context,
       is_dependency,
@@ -478,7 +478,7 @@ impl<'src> Justfile<'src> {
       search,
     )?;
 
-    recipe.run(&context, &scope, &positional, is_dependency)?;
+    recipe.run(&context, &env, is_dependency, &positional, &scope)?;
 
     Self::run_dependencies(
       config,

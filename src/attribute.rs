@@ -25,7 +25,7 @@ pub(crate) enum Attribute<'src> {
   Default,
   Doc(Option<StringLiteral<'src>>),
   Dragonfly,
-  Env(StringLiteral<'src>, StringLiteral<'src>),
+  Env(Expression<'src>, Expression<'src>),
   ExitMessage,
   Extension(StringLiteral<'src>),
   Freebsd,
@@ -44,10 +44,14 @@ pub(crate) enum Attribute<'src> {
   Script(Option<Interpreter<StringLiteral<'src>>>),
   Unix,
   Windows,
-  WorkingDirectory(StringLiteral<'src>),
+  WorkingDirectory(Expression<'src>),
 }
 
 impl AttributeDiscriminant {
+  fn accepts_expressions(self) -> bool {
+    matches!(self, Self::Confirm | Self::Env | Self::WorkingDirectory)
+  }
+
   pub(crate) fn accepts_keyword_arguments(self) -> bool {
     matches!(self, Self::Arg)
   }
@@ -123,17 +127,29 @@ impl<'src> Attribute<'src> {
       );
     }
 
-    if matches!(discriminant, AttributeDiscriminant::Confirm) {
-      if let Some((_name, (keyword, _literal))) = keyword_arguments.into_iter().next() {
+    if discriminant.accepts_expressions() {
+      if let Some((_name, (keyword, _literal))) = keyword_arguments.pop_first() {
         return Err(keyword.error(CompileErrorKind::UnknownAttributeKeyword {
           attribute: name.lexeme(),
           keyword: keyword.lexeme(),
         }));
       }
 
-      return Ok(Self::Confirm(
-        arguments.into_iter().next().map(|(_, expr)| expr),
-      ));
+      return match discriminant {
+        AttributeDiscriminant::Confirm => Ok(Self::Confirm(
+          arguments.into_iter().next().map(|(_, expr)| expr),
+        )),
+        AttributeDiscriminant::Env => {
+          let mut arguments = arguments.into_iter();
+          let (_, key) = arguments.next().unwrap();
+          let (_, value) = arguments.next().unwrap();
+          Ok(Self::Env(key, value))
+        }
+        AttributeDiscriminant::WorkingDirectory => Ok(Self::WorkingDirectory(
+          arguments.into_iter().next().map(|(_, expr)| expr).unwrap(),
+        )),
+        _ => unreachable!(),
+      };
     }
 
     let arguments = arguments
@@ -208,14 +224,12 @@ impl<'src> Attribute<'src> {
         }
       }
       AttributeDiscriminant::Android => Self::Android,
-      AttributeDiscriminant::Confirm => unreachable!(),
+      AttributeDiscriminant::Confirm
+      | AttributeDiscriminant::Env
+      | AttributeDiscriminant::WorkingDirectory => unreachable!(),
       AttributeDiscriminant::Default => Self::Default,
       AttributeDiscriminant::Doc => Self::Doc(arguments.into_iter().next()),
       AttributeDiscriminant::Dragonfly => Self::Dragonfly,
-      AttributeDiscriminant::Env => {
-        let [key, value]: [StringLiteral; 2] = arguments.try_into().unwrap();
-        Self::Env(key, value)
-      }
       AttributeDiscriminant::ExitMessage => Self::ExitMessage,
       AttributeDiscriminant::Extension => Self::Extension(arguments.into_iter().next().unwrap()),
       AttributeDiscriminant::Freebsd => Self::Freebsd,
@@ -240,12 +254,9 @@ impl<'src> Attribute<'src> {
       }),
       AttributeDiscriminant::Unix => Self::Unix,
       AttributeDiscriminant::Windows => Self::Windows,
-      AttributeDiscriminant::WorkingDirectory => {
-        Self::WorkingDirectory(arguments.into_iter().next().unwrap())
-      }
     };
 
-    if let Some((_name, (keyword_name, _literal))) = keyword_arguments.into_iter().next() {
+    if let Some((_name, (keyword_name, _literal))) = keyword_arguments.pop_first() {
       return Err(
         keyword_name.error(CompileErrorKind::UnknownAttributeKeyword {
           attribute: name.lexeme(),
@@ -345,11 +356,12 @@ impl Display for Attribute<'_> {
       | Self::Script(None)
       | Self::Unix
       | Self::Windows => {}
-      Self::Confirm(Some(argument)) => write!(f, "({argument})")?,
-      Self::Doc(Some(argument))
-      | Self::Extension(argument)
-      | Self::Group(argument)
-      | Self::WorkingDirectory(argument) => write!(f, "({argument})")?,
+      Self::Confirm(Some(argument)) | Self::WorkingDirectory(argument) => {
+        write!(f, "({argument})")?;
+      }
+      Self::Doc(Some(argument)) | Self::Extension(argument) | Self::Group(argument) => {
+        write!(f, "({argument})")?;
+      }
       Self::Env(key, value) => write!(f, "({key}, {value})")?,
       Self::Metadata(arguments) => {
         write!(f, "(")?;
