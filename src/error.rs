@@ -2,6 +2,10 @@ use super::*;
 
 #[derive(Debug)]
 pub(crate) enum Error<'src> {
+  AliasDisabled {
+    alias: Modulepath,
+    modules: BTreeSet<Modulepath>,
+  },
   AmbiguousModuleFile {
     module: Name<'src>,
     found: Vec<PathBuf>,
@@ -153,6 +157,9 @@ pub(crate) enum Error<'src> {
   MissingOption {
     recipe: &'src str,
     option: Switch,
+  },
+  ModuleAbsent {
+    module: Modulepath,
   },
   MultipleShortOptions {
     options: String,
@@ -398,6 +405,14 @@ impl ColorDisplay for Error<'_> {
     write!(f, "{error}: {message}")?;
 
     match self {
+      AliasDisabled { alias, modules } => {
+        write!(
+          f,
+          "alias `{alias}` depends on absent {} {}",
+          Count("module", modules.len()),
+          List::and_ticked(modules)
+        )?;
+      }
       AmbiguousModuleFile { module, found } => write!(
         f,
         "found multiple source files for module `{module}`: {}",
@@ -682,6 +697,9 @@ impl ColorDisplay for Error<'_> {
       }
       MissingOption { recipe, option } => {
         write!(f, "recipe `{recipe}` requires option `{option}`")?;
+      }
+      ModuleAbsent { module } => {
+        write!(f, "optional module `{module}` is absent")?;
       }
       MultipleShortOptions { options } => {
         write!(

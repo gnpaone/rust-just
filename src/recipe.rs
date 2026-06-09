@@ -57,8 +57,12 @@ impl<'src, D> Recipe<'src, D> {
       || (cfg!(windows) && windows)
   }
 
-  pub(crate) fn is_script(&self) -> bool {
-    self.shebang
+  pub(crate) fn is_script(&self, settings: &Settings) -> bool {
+    if self.attributes.contains(AttributeDiscriminant::Shell) {
+      false
+    } else {
+      self.shebang || settings.default_script
+    }
   }
 
   pub(crate) fn name(&self) -> &'src str {
@@ -249,10 +253,10 @@ impl<'src> Recipe<'src> {
     let evaluator = Evaluator::new(context, BTreeMap::new(), is_dependency, scope);
 
     let start = Instant::now();
-    let result = if self.is_script() {
+    let result = if self.is_script(&context.module.settings) {
       self.run_script(context, env, evaluator, positional, scope)
     } else {
-      self.run_linewise(context, env, evaluator, positional, scope)
+      self.run_shell(context, env, evaluator, positional, scope)
     };
     let elapsed = start.elapsed();
 
@@ -277,7 +281,7 @@ impl<'src> Recipe<'src> {
     result
   }
 
-  fn run_linewise<'run>(
+  fn run_shell<'run>(
     &self,
     context: &ExecutionContext<'src, 'run>,
     env: &BTreeMap<String, String>,
@@ -497,7 +501,7 @@ impl<'src> Recipe<'src> {
           .or_else(|| context.module.settings.script_interpreter.clone())
           .unwrap_or_else(|| Interpreter::default_script_interpreter().clone()),
       )
-    } else {
+    } else if self.body.first().is_some_and(Line::is_shebang) {
       let line = evaluated_lines
         .first()
         .ok_or_else(|| Error::internal("evaluated_lines was empty"))?;
@@ -506,6 +510,15 @@ impl<'src> Recipe<'src> {
         Shebang::new(line).ok_or_else(|| Error::internal(format!("bad shebang line: {line}")))?;
 
       Executor::Shebang(shebang)
+    } else {
+      Executor::Command(
+        context
+          .module
+          .settings
+          .script_interpreter
+          .clone()
+          .unwrap_or_else(|| Interpreter::default_script_interpreter().clone()),
+      )
     };
 
     let tempdir = context.tempdir(self)?;

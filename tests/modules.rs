@@ -729,6 +729,149 @@ fn nested_absent_optional_module_disables_dependent() {
 }
 
 #[test]
+fn alias_to_disabled_recipe_is_disabled() {
+  Test::new()
+    .justfile(
+      "
+        mod? foo
+
+        build: foo::setup
+          @echo BUILD
+
+        alias b := build
+      ",
+    )
+    .arg("b")
+    .stderr("error: alias `b` depends on absent module `foo`\n")
+    .failure();
+}
+
+#[test]
+fn disabled_alias_is_hidden_from_list() {
+  Test::new()
+    .justfile(
+      "
+        mod? foo
+
+        build: foo::setup
+          @echo BUILD
+
+        alias b := build
+
+        hello:
+          @echo HELLO
+      ",
+    )
+    .arg("--list")
+    .stdout(
+      "
+        Available recipes:
+            hello
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn disabled_alias_runs_once_module_is_present() {
+  Test::new()
+    .justfile(
+      "
+        mod? foo
+
+        build: foo::setup
+          @echo BUILD
+
+        alias b := build
+      ",
+    )
+    .write("foo.just", "setup:\n @echo SETUP")
+    .arg("b")
+    .stdout("SETUP\nBUILD\n")
+    .success();
+}
+
+#[test]
+fn alias_disabled_by_multiple_modules() {
+  Test::new()
+    .justfile(
+      "
+        mod? bar
+        mod? foo
+
+        build: foo::setup bar::ship
+          @echo BUILD
+
+        alias b := build
+      ",
+    )
+    .arg("b")
+    .stderr("error: alias `b` depends on absent modules `bar` and `foo`\n")
+    .failure();
+}
+
+#[test]
+fn alias_to_recipe_in_absent_module_is_disabled() {
+  Test::new()
+    .justfile(
+      "
+        mod? foo
+
+        alias b := foo::build
+      ",
+    )
+    .arg("b")
+    .stderr("error: alias `b` depends on absent module `foo`\n")
+    .failure();
+}
+
+#[test]
+fn recipe_in_absent_optional_module_is_error() {
+  Test::new()
+    .justfile("mod? foo")
+    .arg("foo::bar")
+    .stderr("error: optional module `foo` is absent\n")
+    .failure();
+}
+
+#[test]
+fn recipe_in_nested_absent_optional_module_is_error() {
+  Test::new()
+    .justfile("mod a")
+    .write("a/mod.just", "mod? b")
+    .arg("a::b::c")
+    .stderr("error: optional module `a::b` is absent\n")
+    .failure();
+}
+
+#[test]
+fn show_recipe_in_absent_optional_module_is_error() {
+  Test::new()
+    .justfile("mod? foo")
+    .args(["--show", "foo::bar"])
+    .stderr("error: optional module `foo` is absent\n")
+    .failure();
+}
+
+#[test]
+fn list_absent_optional_module_is_error() {
+  Test::new()
+    .justfile("mod? foo")
+    .args(["--list", "foo"])
+    .stderr("error: optional module `foo` is absent\n")
+    .failure();
+}
+
+#[test]
+fn evaluate_absent_optional_module_is_error() {
+  Test::new()
+    .justfile("mod? foo")
+    .args(["--evaluate", "foo::bar"])
+    .stderr("error: optional module `foo` is absent\n")
+    .failure();
+}
+
+#[test]
 fn root_dotenv_is_available_to_submodules() {
   Test::new()
     .justfile(
@@ -940,7 +1083,7 @@ fn recipes_may_be_named_mod() {
 }
 
 #[test]
-fn submodule_linewise_recipes_run_in_submodule_directory() {
+fn submodule_shell_recipes_run_in_submodule_directory() {
   Test::new()
     .write("foo/bar", "BAR")
     .write("foo/mod.just", "foo:\n @cat bar")

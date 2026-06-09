@@ -268,13 +268,25 @@ impl<'src: 'run, 'run> InvocationParser<'src, 'run> {
           });
         }
         return Ok((recipe, i + 1));
-      } else if let Some(disabled) = current.disabled.get(arg) {
+      } else if let Some(disabled) = current.disabled_recipes.get(arg) {
         return Err(Error::RecipeDisabled {
           recipe: Modulepath {
             components: path,
             spaced: !modulepath,
           },
           modules: disabled.modules.clone(),
+        });
+      } else if let Some(disabled) = current.disabled_aliases.get(arg) {
+        return Err(Error::AliasDisabled {
+          alias: Modulepath {
+            components: path,
+            spaced: !modulepath,
+          },
+          modules: disabled.modules.clone(),
+        });
+      } else if current.absent_modules.contains(arg) {
+        return Err(Error::ModuleAbsent {
+          module: current.module_path.join(arg),
         });
       } else {
         if modulepath && i + 1 < args.len() {
@@ -450,6 +462,25 @@ mod tests {
         recipe,
         suggestion: None
       } if recipe == "foo::zzz",
+    );
+  }
+
+  #[test]
+  fn recipe_in_absent_optional_module() {
+    let tempdir = tempfile::tempdir().unwrap();
+    tempdir.write("justfile", "mod? foo");
+
+    let loader = Loader::new();
+    let compilation = Compiler::compile(
+      &Config::new().unwrap(),
+      &loader,
+      &tempdir.path().join("justfile"),
+    )
+    .unwrap();
+
+    assert_matches!(
+      InvocationParser::parse_invocations(&compilation.justfile, &["foo::bar"]).unwrap_err(),
+      Error::ModuleAbsent { module } if module.to_string() == "foo",
     );
   }
 
