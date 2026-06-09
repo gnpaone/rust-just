@@ -774,7 +774,7 @@ lint:
 ```
 
 If no recipe makes sense as the default recipe, you can use
-`default-list`<sup>master</sup> to list the available recipes instead:
+`default-list`<sup>1.52.0</sup> to list the available recipes instead:
 
 ```just
 set default-list := true
@@ -841,7 +841,7 @@ test build
 ```
 
 If you'd like `just` to default to listing the recipes in the `justfile`, set
-`default-list`<sup>master</sup>:
+`default-list`<sup>1.52.0</sup>:
 
 ```just
 set default-list := true
@@ -852,7 +852,7 @@ enabled lists that module's recipes.
 
 You can also default to listing recipes this behavior by settting the
 environment variable `JUST_DEFAULT_LIST=true` or passing
-`--default-list`<sup>master</sup>.
+`--default-list`<sup>1.52.0</sup>.
 
 
 The heading text can be customized with `--list-heading`:
@@ -1041,6 +1041,7 @@ foo:
 | `allow-duplicate-recipes` | boolean | `false` | Allow recipes appearing later in a `justfile` to override earlier recipes with the same name. |
 | `allow-duplicate-variables` | boolean | `false` | Allow variables appearing later in a `justfile` to override earlier variables with the same name. |
 | `default-list` | boolean | `false` | List recipes instead of running the default recipe. |
+| `default-script`<sup>1.52.0</sup> | boolean | `false` | Default recipes to script instead of shell. |
 | `dotenv-filename` | string | - | Load a `.env` file with a custom name, if present. |
 | `dotenv-load` | boolean | `false` | Load a `.env` file, if present. |
 | `dotenv-override` | boolean | `false` | Override existing environment variables with values from the `.env` file. |
@@ -1235,8 +1236,8 @@ evaluated.
 #### Positional Arguments
 
 If `positional-arguments` is `true`, recipe arguments will be passed as
-positional arguments to commands. For linewise recipes, argument `$0` will be
-the name of the recipe.
+positional arguments to commands. For shell recipes, argument `$0` will be the
+name of the recipe.
 
 For example, running this recipe:
 
@@ -1740,7 +1741,7 @@ foo := f'I {{{{LOVE} curly braces!'
 
 ### Sigils
 
-Commands in linewise recipes may be prefixed with any combination of the sigils
+Commands in shell recipes may be prefixed with any combination of the sigils
 `-`, `@`, and `?`.
 
 The `@` sigil toggles command echoing:
@@ -2370,6 +2371,7 @@ change their behavior.
 | `[private]`<sup>1.10.0</sup> | alias, recipe | Make recipe, alias, or variable private. See [Private Recipes](#private-recipes). |
 | `[script(COMMAND)]`<sup>1.32.0</sup> | recipe | Execute recipe as a script interpreted by `COMMAND`. See [script recipes](#script-recipes) for more details. |
 | `[script]`<sup>1.33.0</sup> | recipe | Execute recipe as script. See [script recipes](#script-recipes) for more details. |
+| `[shell]`<sup>1.52.0</sup> | recipe | Execute recipe as a shell recipe, overriding `set default-script`. |
 | `[unix]`<sup>1.8.0</sup> | recipe | Enable recipe on unixes. (Includes macOS). |
 | `[windows]`<sup>1.8.0</sup> | recipe | Enable recipe on Windows. |
 | `[working-directory(PATH)]`<sup>1.38.0</sup> | recipe | Set recipe working directory. `PATH` may be an expression<sup>1.51.0</sup> whose value is relative or absolute. If relative, it is interpreted relative to the default working directory. |
@@ -3381,6 +3383,10 @@ the value of `set shell`.
 The body of the recipe is evaluated, written to disk in the temporary
 directory, and run by passing its path as an argument to `COMMAND`.
 
+With `set default-script := true`<sup>1.52.0</sup>, recipes default to script
+recipes instead of shell recipes, unless overridden with the `[shell]`
+attribute<sup>1.52.0</sup>.
+
 ### Script and Shebang Recipe Temporary Files
 
 Both script and shebang recipes write the recipe body to a temporary file for
@@ -3450,8 +3456,8 @@ foo:
 ```
 
 It isn't strictly necessary, but `set -euxo pipefail` turns on a few useful
-features that make `bash` shebang recipes behave more like normal, linewise
-`just` recipes:
+features that make `bash` shebang recipes behave more like normal, shell `just`
+recipes:
 
 - `set -e` makes `bash` exit if a command fails.
 
@@ -3460,7 +3466,7 @@ features that make `bash` shebang recipes behave more like normal, linewise
 - `set -x` makes `bash` print each script line before it's run.
 
 - `set -o pipefail` makes `bash` exit if a command in a pipeline fails. This is
-  `bash`-specific, so isn't turned on in normal linewise `just` recipes.
+  `bash`-specific, so isn't turned on in normal shell `just` recipes.
 
 Together, these avoid a lot of shell scripting gotchas.
 
@@ -4216,9 +4222,9 @@ mod? foo
 ```
 
 Missing source files for optional modules do not produce an error. If a recipe
-depends on a missing optional module, directly, or transitively, it will be
-disabled. Attempting to invoke a disabled recipe is an error, but other
-non-disabled recipes can still be run.<sup>master</sup>
+or alias depends on a missing optional module, directly, or transitively, it
+will be disabled. Attempting to invoke a disabled recipe or alias is an error,
+but other non-disabled recipes can still be run.<sup>1.52.0</sup>
 
 Optional modules with no source file do not conflict, so you can have multiple
 mod statements with the same name, but with different source file paths, as
@@ -4314,6 +4320,9 @@ $ cat justfile
 some-recipe:
     echo "foo"
 ```
+
+When the `justfile` is read from standard input with `--justfile -`, `--fmt`
+prints the formatted `justfile` to stdout.
 
 Note that formatting is not covered by any backwards compatibility guarantee
 and is subject to change from time to time.
@@ -4437,9 +4446,9 @@ with double quotes.
 
 ### Configuring the Shell
 
-There are a number of ways to configure the shell for linewise recipes, which
-are the default when a recipe does not start with a `#!` shebang. Their
-precedence, from highest to lowest, is:
+There are a number of ways to configure the shell for shell recipes, which are
+the default when a recipe does not start with a `#!` shebang. Their precedence,
+from highest to lowest, is:
 
 1. The `--shell` and `--shell-arg` command line options. Passing either of
    these will cause `just` to ignore any settings in the current justfile.

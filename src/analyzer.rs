@@ -43,7 +43,7 @@ impl<'run, 'src> Analyzer<'run, 'src> {
     private: bool,
     root: &Path,
   ) -> RunResult<'src, Justfile<'src>> {
-    let mut absent = BTreeSet::new();
+    let mut absent_modules = BTreeSet::new();
     let mut definitions = HashMap::new();
     let mut imports = HashSet::new();
     let mut unstable_features = BTreeSet::new();
@@ -99,7 +99,7 @@ impl<'run, 'src> Analyzer<'run, 'src> {
                 absolute,
               )?);
             } else if *optional {
-              absent.insert(name.lexeme().to_string());
+              absent_modules.insert(name.lexeme().to_string());
             }
           }
           Item::Newline => {}
@@ -204,7 +204,7 @@ impl<'run, 'src> Analyzer<'run, 'src> {
         if let Some(assignment) = assignments.get(name) {
           overrides.insert(assignment.number, value.clone());
         } else {
-          unknown_overrides.push(path.join(name));
+          unknown_overrides.push(path.join(name).to_string());
         }
       } else if path.starts_with(&ast.module_path)
         && !self
@@ -240,7 +240,8 @@ impl<'run, 'src> Analyzer<'run, 'src> {
         deduplicated_recipes.insert(recipe.clone());
       }
 
-      if !recipe.is_script() {
+      if !recipe.is_script(&settings) {
+        let mut continued = false;
         for line in &recipe.body {
           let sigils = line.sigils(&settings);
 
@@ -248,18 +249,39 @@ impl<'run, 'src> Analyzer<'run, 'src> {
             let Fragment::Text { token } = line.fragments.first().unwrap() else {
               unreachable!();
             };
-            return Err(
-              token
-                .error(CompileErrorKind::GuardAndInfallibleSigil)
-                .into(),
-            );
+            return Err(token.error(GuardAndInfallibleSigil).into());
           }
+
+          if !continued {
+            if let Some(Fragment::Text { token }) = line.fragments.first() {
+              let text = token.lexeme();
+
+              if text.starts_with(' ') || text.starts_with('\t') {
+                return Err(token.error(ExtraLeadingWhitespace).into());
+              }
+            }
+          }
+
+          continued = line.is_continuation();
+        }
+
+        if let Some(attribute) = recipe.attributes.get(AttributeDiscriminant::Extension) {
+          return Err(
+            recipe
+              .name
+              .error(InvalidAttribute {
+                item_kind: "recipe",
+                item_name: recipe.name.lexeme(),
+                attribute: Box::new(attribute.clone()),
+              })
+              .into(),
+          );
         }
       }
     }
 
-    let (recipes, disabled) = RecipeResolver::resolve_recipes(
-      &absent,
+    let (recipes, disabled_recipes) = RecipeResolver::resolve_recipes(
+      &absent_modules,
       &assignments,
       &functions,
       &ast.module_path,
@@ -269,8 +291,36 @@ impl<'run, 'src> Analyzer<'run, 'src> {
     )?;
 
     let mut aliases = Table::new();
+    let mut disabled_aliases = Table::new();
     while let Some(alias) = self.aliases.pop() {
-      aliases.insert(Self::resolve_alias(&self.modules, &recipes, alias)?);
+      match Resolution::resolve(
+        &alias.target,
+        &self.modules,
+        &absent_modules,
+        &recipes,
+        &disabled_recipes,
+      ) {
+        Some(Resolution::Resolved(target)) => {
+          aliases.insert(alias.resolve(target));
+        }
+        Some(Resolution::Disabled(modules)) => {
+          disabled_aliases.insert(Disabled {
+            modules,
+            name: alias.name,
+          });
+        }
+        None => {
+          return Err(
+            alias
+              .name
+              .error(UnknownAliasTarget {
+                alias: alias.name.lexeme(),
+                target: alias.target,
+              })
+              .into(),
+          );
+        }
+      }
     }
 
     let source = root.to_owned();
@@ -309,11 +359,12 @@ impl<'run, 'src> Analyzer<'run, 'src> {
     });
 
     Ok(Justfile {
-      absent,
+      absent_modules,
       aliases,
       assignments,
       default,
-      disabled,
+      disabled_aliases,
+      disabled_recipes,
       doc: doc.filter(|doc| !doc.is_empty()),
       functions,
       groups: groups.into(),
@@ -388,31 +439,6 @@ impl<'run, 'src> Analyzer<'run, 'src> {
       }
     }
 
-    let mut continued = false;
-    for line in &recipe.body {
-      if !recipe.is_script() && !continued {
-        if let Some(Fragment::Text { token }) = line.fragments.first() {
-          let text = token.lexeme();
-
-          if text.starts_with(' ') || text.starts_with('\t') {
-            return Err(token.error(ExtraLeadingWhitespace));
-          }
-        }
-      }
-
-      continued = line.is_continuation();
-    }
-
-    if !recipe.is_script() {
-      if let Some(attribute) = recipe.attributes.get(AttributeDiscriminant::Extension) {
-        return Err(recipe.name.error(InvalidAttribute {
-          item_kind: "recipe",
-          item_name: recipe.name.lexeme(),
-          attribute: Box::new(attribute.clone()),
-        }));
-      }
-    }
-
     Ok(())
   }
 
@@ -445,20 +471,6 @@ impl<'run, 'src> Analyzer<'run, 'src> {
     Ok(())
   }
 
-  fn resolve_alias<'a>(
-    modules: &'a Table<'src, Justfile<'src>>,
-    recipes: &'a Table<'src, Arc<Recipe<'src>>>,
-    alias: Alias<'src, Namepath<'src>>,
-  ) -> CompileResult<'src, Alias<'src>> {
-    match Self::resolve_recipe(&alias.target, modules, recipes) {
-      Some(target) => Ok(alias.resolve(target)),
-      None => Err(alias.name.error(UnknownAliasTarget {
-        alias: alias.name.lexeme(),
-        target: alias.target,
-      })),
-    }
-  }
-
   pub(crate) fn resolve_call(
     functions: &'run Table<'src, FunctionDefinition<'src>>,
     name: Name<'src>,
@@ -483,22 +495,6 @@ impl<'run, 'src> Analyzer<'run, 'src> {
     }
 
     Ok(())
-  }
-
-  pub(crate) fn resolve_recipe<'a>(
-    path: &Namepath<'src>,
-    mut modules: &'a Table<'src, Justfile<'src>>,
-    mut recipes: &'a Table<'src, Arc<Recipe<'src>>>,
-  ) -> Option<Arc<Recipe<'src>>> {
-    let (name, path) = path.split_last();
-
-    for name in path {
-      let module = modules.get(name.lexeme())?;
-      modules = &module.modules;
-      recipes = &module.recipes;
-    }
-
-    recipes.get(name.lexeme()).cloned()
   }
 }
 
