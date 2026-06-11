@@ -130,7 +130,7 @@ impl<'src> Recipe<'src> {
   pub(crate) fn confirm(&self, evaluator: &mut Evaluator<'src, '_>) -> RunResult<'src, bool> {
     if let Some(Attribute::Confirm(prompt)) = self.attributes.get(AttributeDiscriminant::Confirm) {
       if let Some(expression) = prompt {
-        eprint!("{} ", evaluator.evaluate_expression(expression)?);
+        eprint!("{} ", evaluator.evaluate_value(expression)?);
       } else {
         eprint!("Run recipe `{}`? ", self.name);
       }
@@ -213,7 +213,7 @@ impl<'src> Recipe<'src> {
     for attribute in &self.attributes {
       if let Attribute::WorkingDirectory(expression) = attribute {
         return Ok(Some(
-          working_directory.join(&evaluator.evaluate_expression(expression)?),
+          working_directory.join(&evaluator.evaluate_string(expression)?),
         ));
       }
     }
@@ -250,7 +250,13 @@ impl<'src> Recipe<'src> {
       }
     }
 
-    let evaluator = Evaluator::new(context, BTreeMap::new(), is_dependency, scope);
+    let evaluator = Evaluator::new(
+      context,
+      BTreeMap::new(),
+      is_dependency,
+      Some(self.name),
+      scope,
+    );
 
     let start = Instant::now();
     let result = if self.is_script(&context.module.settings) {
