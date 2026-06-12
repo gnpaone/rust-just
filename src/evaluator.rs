@@ -111,6 +111,9 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         Setting::Lazy(value) => {
           settings.lazy = value;
         }
+        Setting::Lists(value) => {
+          settings.lists = value;
+        }
         Setting::NoCd(value) => {
           settings.no_cd = value;
         }
@@ -300,9 +303,13 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     arguments: &[Expression<'src>],
   ) -> RunResult<'src, Value> {
     match function {
-      Function::Nullary(f) => f(self.function_context(name).unwrap()),
+      Function::Nullary(f) => f(self.function_context(name).unwrap()).map(Value::from),
       Function::Unary(f) => {
         let a = self.evaluate_string(&arguments[0])?;
+        f(self.function_context(name).unwrap(), &a).map(Value::from)
+      }
+      Function::UnaryList(f) => {
+        let a = self.evaluate_value(&arguments[0])?;
         f(self.function_context(name).unwrap(), &a)
       }
       Function::UnaryOpt(f) => {
@@ -312,7 +319,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         } else {
           None
         };
-        f(self.function_context(name).unwrap(), &a, b.as_deref())
+        f(self.function_context(name).unwrap(), &a, b.as_deref()).map(Value::from)
       }
       Function::UnaryPlus(f) => {
         let a = self.evaluate_string(&arguments[0])?;
@@ -320,12 +327,12 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         for arg in &arguments[1..] {
           rest.push(self.evaluate_string(arg)?);
         }
-        f(self.function_context(name).unwrap(), &a, &rest)
+        f(self.function_context(name).unwrap(), &a, &rest).map(Value::from)
       }
       Function::Binary(f) => {
         let a = self.evaluate_string(&arguments[0])?;
         let b = self.evaluate_string(&arguments[1])?;
-        f(self.function_context(name).unwrap(), &a, &b)
+        f(self.function_context(name).unwrap(), &a, &b).map(Value::from)
       }
       Function::BinaryPlus(f) => {
         let a = self.evaluate_string(&arguments[0])?;
@@ -334,16 +341,15 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         for arg in &arguments[2..] {
           rest.push(self.evaluate_string(arg)?);
         }
-        f(self.function_context(name).unwrap(), &a, &b, &rest)
+        f(self.function_context(name).unwrap(), &a, &b, &rest).map(Value::from)
       }
       Function::Ternary(f) => {
         let a = self.evaluate_string(&arguments[0])?;
         let b = self.evaluate_string(&arguments[1])?;
         let c = self.evaluate_string(&arguments[2])?;
-        f(self.function_context(name).unwrap(), &a, &b, &c)
+        f(self.function_context(name).unwrap(), &a, &b, &c).map(Value::from)
       }
     }
-    .map(Value::from)
     .map_err(|message| Error::FunctionCall {
       function: name,
       message,
@@ -354,7 +360,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     &mut self,
     expression: &Expression<'src>,
   ) -> RunResult<'src, String> {
-    Ok(self.evaluate_value(expression)?.into_joined())
+    Ok(self.evaluate_value(expression)?.into_string())
   }
 
   pub(crate) fn evaluate_value(&mut self, expression: &Expression<'src>) -> RunResult<'src, Value> {
@@ -593,7 +599,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
       let value = if group.is_empty() {
         if let Some(ref default) = parameter.default {
           let value = evaluator.evaluate_value(default)?;
-          positional.push(value.joined().into_owned());
+          positional.push(value.join().into_owned());
           value
         } else if parameter.kind == ParameterKind::Star {
           Value::new()
@@ -613,9 +619,15 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         Value::from(group[0].clone())
       };
 
-      for part in value.parts() {
-        parameter.check_pattern_match(recipe, part)?;
+      for element in value.elements() {
+        parameter.check_pattern_match(recipe, element)?;
       }
+
+      let value = if context.module.settings.lists {
+        value
+      } else {
+        value.into_string().into()
+      };
 
       evaluator.scope.bind(Binding {
         eager: false,
