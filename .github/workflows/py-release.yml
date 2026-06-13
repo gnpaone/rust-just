@@ -91,7 +91,7 @@ jobs:
     needs: [find-latest-tag]
     strategy:
       matrix:
-        runner: [windows-latest]
+        runner: [windows-2025-vs2026]
         target: [x64, x86]
     steps:
       - uses: actions/checkout@v6
