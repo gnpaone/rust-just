@@ -310,7 +310,10 @@ impl<'src, 'run> Evaluator<'src, 'run> {
       }
       Function::UnaryList(f) => {
         let a = self.evaluate_value(&arguments[0])?;
-        f(self.function_context(name).unwrap(), &a)
+        a.elements()
+          .iter()
+          .map(|element| f(self.function_context(name).unwrap(), element))
+          .collect()
       }
       Function::UnaryOpt(f) => {
         let a = self.evaluate_string(&arguments[0])?;
@@ -328,6 +331,11 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           rest.push(self.evaluate_string(arg)?);
         }
         f(self.function_context(name).unwrap(), &a, &rest).map(Value::from)
+      }
+      Function::BinaryList(f) => {
+        let a = self.evaluate_value(&arguments[0])?;
+        let b = self.evaluate_value(&arguments[1])?;
+        f(self.function_context(name).unwrap(), &a, &b)
       }
       Function::Binary(f) => {
         let a = self.evaluate_string(&arguments[0])?;
@@ -566,7 +574,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
   }
 
   pub(crate) fn evaluate_parameters(
-    arguments: &[Vec<String>],
+    arguments: &[Value],
     context: &ExecutionContext<'src, 'run>,
     is_dependency: bool,
     parameters: &[Parameter<'src>],
@@ -595,32 +603,30 @@ impl<'src, 'run> Evaluator<'src, 'run> {
       return Err(Error::internal("arguments do not match parameter count"));
     }
 
-    for (parameter, group) in parameters.iter().zip(arguments) {
-      let value = if group.is_empty() {
+    for (parameter, argument) in parameters.iter().zip(arguments) {
+      let value = if argument.elements().is_empty() {
         if let Some(ref default) = parameter.default {
-          let value = evaluator.evaluate_value(default)?;
-          positional.push(value.join().into_owned());
-          value
+          evaluator.evaluate_value(default)?
         } else if parameter.kind == ParameterKind::Star {
           Value::new()
         } else {
-          return Err(Error::internal("missing parameter without default"));
+          return Err(Error::EmptyListArgument {
+            parameter: parameter.name.lexeme(),
+            recipe: recipe.name(),
+          });
         }
-      } else if parameter.kind.is_variadic() {
-        positional.extend_from_slice(group);
-        group.iter().cloned().collect()
       } else {
-        if group.len() != 1 {
-          return Err(Error::internal(
-            "multiple values for non-variadic parameter",
-          ));
-        }
-        positional.push(group[0].clone());
-        Value::from(group[0].clone())
+        argument.clone()
       };
 
       for element in value.elements() {
         parameter.check_pattern_match(recipe, element)?;
+      }
+
+      if parameter.kind.is_variadic() {
+        positional.extend(value.elements().iter().cloned());
+      } else {
+        positional.push(value.join().into_owned());
       }
 
       let value = if context.module.settings.lists {

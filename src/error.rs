@@ -99,6 +99,10 @@ pub(crate) enum Error<'src> {
     editor: OsString,
     status: ExitStatus,
   },
+  EmptyListArgument {
+    parameter: &'src str,
+    recipe: &'src str,
+  },
   EvalUnknownSubmodule {
     component: String,
     suggestion: Option<Suggestion<'src>>,
@@ -409,7 +413,7 @@ impl ColorDisplay for Error<'_> {
         write!(
           f,
           "alias `{alias}` depends on absent {} {}",
-          Count("module", modules.len()),
+          Count::unnumbered("module", modules.len()),
           List::and_ticked(modules)
         )?;
       }
@@ -568,10 +572,10 @@ impl ColorDisplay for Error<'_> {
         recipe,
         min_arguments,
       } => {
-        let count = Count("argument", *min_arguments);
         write!(
           f,
-          "recipe `{recipe}` cannot be used as default recipe since it requires at least {min_arguments} {count}",
+          "recipe `{recipe}` cannot be used as default recipe since it requires at least {}",
+          Count::numbered("argument", min_arguments),
         )?;
       }
       Dotenv { dotenv_error, path } => {
@@ -600,6 +604,12 @@ impl ColorDisplay for Error<'_> {
       EditorStatus { editor, status } => {
         let editor = editor.to_string_lossy();
         write!(f, "editor `{editor}` failed: {status}")?;
+      }
+      EmptyListArgument { parameter, recipe } => {
+        write!(
+          f,
+          "recipe `{recipe}` parameter `{parameter}` requires at least one element but received an empty list"
+        )?;
       }
       EvalUnknownSubmodule { component, .. } => {
         write!(f, "justfile does not contain submodule `{component}`")?;
@@ -723,25 +733,25 @@ impl ColorDisplay for Error<'_> {
         max,
         ..
       } => {
-        let count = Count("argument", *found);
+        let arguments = Count::numbered("positional argument", found);
         if min == max {
           let expected = min;
           let only = if expected < found { "only " } else { "" };
           write!(
             f,
-            "recipe `{}` got {found} positional {count} but {only}takes {expected}",
+            "recipe `{}` got {arguments} but {only}takes {expected}",
             recipe.name(),
           )?;
         } else if found < min {
           write!(
             f,
-            "recipe `{}` got {found} positional {count} but takes at least {min}",
+            "recipe `{}` got {arguments} but takes at least {min}",
             recipe.name(),
           )?;
         } else if found > max {
           write!(
             f,
-            "recipe `{}` got {found} positional {count} but takes at most {max}",
+            "recipe `{}` got {arguments} but takes at most {max}",
             recipe.name(),
           )?;
         }
@@ -750,7 +760,7 @@ impl ColorDisplay for Error<'_> {
         write!(
           f,
           "recipe `{recipe}` depends on absent {} {}",
-          Count("module", modules.len()),
+          Count::unnumbered("module", modules.len()),
           List::and_ticked(modules)
         )?;
       }
@@ -864,11 +874,11 @@ impl ColorDisplay for Error<'_> {
         write!(f, "recipe `{recipe}` does not have option `{option}`")?;
       }
       UnknownOverrides { overrides } => {
-        let count = Count("variable", overrides.len());
-        let overrides = List::and_ticked(overrides);
         write!(
           f,
-          "{count} {overrides} overridden on the command line but not present in justfile",
+          "{} {} overridden on the command line but not present in justfile",
+          Count::unnumbered("variable", overrides.len()),
+          List::and_ticked(overrides),
         )?;
       }
       UnknownGroup { group } => {
