@@ -1237,18 +1237,39 @@ evaluated.
 #### Lists
 
 The `lists` setting<sup>master</sup> allows values that are lists of strings.
-It is currently unstable and very likely to change in backwards incompatible
-ways.
+It is currently unstable and will change in backwards incompatible ways. This
+section documents changes in behavior when `set lists` is enabled.
 
-Currently, the only place that lists of strings are produced are variadic
-recipe parameters. Without `set lists`, they are joined into a single
-space-separated string.
+Variadic recipe parameters are lists of strings instead of single
+space-separated strings.
 
-In most places, there is no difference in behavior between a list and
-space-separated string.
+The following functions apply to each list element individually:
 
-The only exception is the `quote()` function, where each list element is quoted
-individually:
+- `absolute_path()`
+- `append()`
+- `prepend()`
+- `quote()`
+
+`append()` and `prepend()` do not split elements on whitespace and error if the
+first argument is not a single-element list.
+
+Each argument to a dependency binds to exactly one parameter, and supplying
+extra arguments to a variadic dependency is an error.
+
+Dependencies may be invoked once per element of a list with
+`*(recipe *argument)`.
+
+A parameter evaluates to the default when the argument is an empty list.
+
+Passing an empty list to a non-`*` parameter without a default is an error.
+
+When `positional-arguments` is set, list arguments are space-joined unless they
+are variadic, in which case they are passed as one positional argument per
+element.
+
+##### Examples
+
+Each list element is `quote()`'ed separately:
 
 ```just
 set unstable
@@ -1264,8 +1285,52 @@ bar
 baz bob
 ```
 
-The return value of `quote(args)` is `'foo' 'bar' 'baz bob'`, instead of
-`'foo bar baz boo'`, as would be the case wihout `set list`.
+The return value of `quote(args)` is `'bar' 'baz bob'`, instead of
+`'bar baz bob'`, as would be the case without `set lists`.
+
+Variadic positional arguments:
+
+```just
+set unstable
+set lists
+set positional-arguments
+
+foo *args: (bar args 'bob') (baz args)
+
+@bar first second:
+  echo first=$1
+  echo second=$2
+
+@baz *args:
+  echo '$1='$1
+  echo '$2='$2
+```
+
+```console
+$ just foo one two
+first=one two
+second=bob
+$1=one
+$2=two
+```
+
+A mapped dependency is invoked once per element of its starred argument:
+
+```just
+set unstable
+set lists
+
+build target *platform: *(compile target *platform)
+
+@compile target platform:
+  echo compiling {{ target }} for {{ platform }}…
+```
+
+```console
+$ just build x86 foo bar
+compiling foo for x86…
+compiling bar for x86…
+```
 
 #### Positional Arguments
 
@@ -2101,8 +2166,7 @@ The process ID is: 420
   [JavaScript `encodeURIComponent` function](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent).
 - `quote(s)` - Replace all single quotes with `'\''` and prepend and append
   single quotes to `s`. This is sufficient to escape special characters for
-  many shells, including most Bourne shell descendants. With `set
-  lists`<sup>master</sup>, each element of `s` is quoted individually.
+  many shells, including most Bourne shell descendants.
 - `replace(s, from, to)` - Replace all occurrences of `from` in `s` with `to`.
 - `replace_regex(s, regex, replacement)` - Replace all occurrences of `regex`
   in `s` with `replacement`. Regular expressions are provided by the
