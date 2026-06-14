@@ -3,7 +3,7 @@ use {
     assert_stdout::assert_stdout,
     assert_success::assert_success,
     tempdir::tempdir,
-    test::{Output, Test, assert_eval_eq},
+    test::{Output, Test, assert_eval_eq, assert_list_eq},
   },
   just::{Response, unindent},
   pretty_assertions::Comparison,
@@ -28,7 +28,9 @@ use {
   which::which,
 };
 
+const FALSE: &str = "[]";
 const JUST: &str = env!("CARGO_BIN_EXE_just");
+const TRUE: &str = "\"true\"";
 
 fn default<T: Default>() -> T {
   Default::default()
@@ -49,11 +51,13 @@ mod assertions;
 mod assignment;
 mod attributes;
 mod backticks;
+mod booleans;
 mod byte_order_mark;
 mod ceiling;
 mod changelog;
 mod choose;
 mod command;
+mod comparison;
 mod completions;
 mod conditional;
 mod confirm;
@@ -91,6 +95,7 @@ mod justfile_from_stdin;
 mod lazy;
 mod line_prefixes;
 mod list;
+mod list_literals;
 mod lists;
 mod logical_operators;
 mod man;
@@ -99,6 +104,7 @@ mod markdown;
 mod misc;
 mod modules;
 mod multibyte_char;
+mod negation;
 mod newline_escape;
 mod no_aliases;
 mod no_cd;
