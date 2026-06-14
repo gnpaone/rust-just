@@ -1243,6 +1243,10 @@ section documents changes in behavior when `set lists` is enabled.
 Variadic recipe parameters are lists of strings instead of single
 space-separated strings.
 
+List literals are written `[a, b, c]`. List literals flatten their arguments,
+lists may only contain strings and not other lists. For example,
+`[["a", "b"], [], "c"]` evaluates to `["a", "b", "c"]`.
+
 The following functions apply to each list element individually:
 
 - `absolute_path()`
@@ -1252,6 +1256,25 @@ The following functions apply to each list element individually:
 
 `append()` and `prepend()` do not split elements on whitespace and error if the
 first argument is not a single-element list.
+
+The canonical boolean true value is the string `"true"`, and the canonical
+boolean false value is the empty list `[]`. All values other than the empty
+list are truthy, including `''`.
+
+A `bool(value)` function is available for converting to the canonical boolean
+values. It returns `[]` when `value` is `""` `"0"` `"false"`, or `[]`, and
+`"true"` when `value` is `"1"` or `"true"`. All other values are an error. It
+can be used to parse booleans passed as arguments or environment variables.
+
+A `show(value)` function is available for converting `value` into a string
+containing its literal representation. Brackets are used for empty and
+multi-element lists, e.g., `"[]"` and `"["foo", "bar"]"`, but not
+single-element lists, e.g., `"foo"`.
+
+The functions `is_dependency()`, `path_exists()`, and `semver_matches()` return
+the canonical booleans.
+
+`which()` returns the empty list when no executable is found.
 
 Each argument to a dependency binds to exactly one parameter, and supplying
 extra arguments to a variadic dependency is an error.
@@ -1266,6 +1289,15 @@ Passing an empty list to a non-`*` parameter without a default is an error.
 When `positional-arguments` is set, list arguments are space-joined unless they
 are variadic, in which case they are passed as one positional argument per
 element.
+
+The condition of an `if` or `assert()` may be any expression, which is
+evaluated for truthiness.
+
+The comparison operators `==`, `!=`, `=~`, and `!~` may be used anywhere, not
+just in `if` and `assert()`, and evaluate to `"true"` or `[]`.
+
+Values may be negated with `!`. `!expression` evaluates to `"true"` if
+`expression` is `[]`, otherwise it evaluates to `[]`.
 
 ##### Examples
 
@@ -1626,25 +1658,27 @@ foobar := 'foo' + 'bar'
 
 #### Logical Operators
 
-The logical operators `&&` and `||` can be used to coalesce string
-values<sup>1.37.0</sup>, similar to Python's `and` and `or`. These operators
-consider the empty string `''` to be false, and all other strings to be true.
+The logical operators `&&` and `||` can be used to coalesce
+values<sup>1.37.0</sup>, similar to Python's `and` and `or`. The only false
+value is the empty list `[]`; every other value, including the empty string
+`''`, is true.
 
-These operators are currently unstable.
+These operators require `set lists`<sup>master</sup>, which is currently
+unstable.
 
-The `&&` operator returns the empty string if the left-hand argument is the
-empty string, otherwise it returns the right-hand argument:
+The `&&` operator returns the empty list if the left-hand argument is false,
+otherwise it returns the right-hand argument:
 
 ```justfile
-foo := '' && 'goodbye'      # ''
+foo := [] && 'goodbye'      # []
 bar := 'hello' && 'goodbye' # 'goodbye'
 ```
 
-The `||` operator returns the left-hand argument if it is non-empty, otherwise
-it returns the right-hand argument:
+The `||` operator returns the left-hand argument if it is true, otherwise it
+returns the right-hand argument:
 
 ```justfile
-foo := '' || 'goodbye'      # 'goodbye'
+foo := [] || 'goodbye'      # 'goodbye'
 bar := 'hello' || 'goodbye' # 'hello'
 ```
 
@@ -1998,15 +2032,6 @@ $ just
 - `env_var(key)` — Deprecated alias for `env(key)`.
 - `env_var_or_default(key, default)` — Deprecated alias for `env(key, default)`.
 
-A default can be substituted for an empty environment variable value with the
-`||` operator, currently unstable:
-
-```just
-set unstable
-
-foo := env('FOO', '') || 'DEFAULT_VALUE'
-```
-
 #### Executables
 
 - `require(name)`<sup>1.39.0</sup> — Search directories in the `PATH`
@@ -2156,8 +2181,9 @@ The process ID is: 420
 
 #### String Manipulation
 
-- `append(suffix, s)`<sup>1.27.0</sup> - Append `suffix` to whitespace-separated
-  strings in `s`. `append('/src', 'foo bar baz')` → `'foo/src bar/src baz/src'`
+- `append(suffix, s)`<sup>1.27.0</sup> - Append `suffix` to
+  whitespace-separated strings in `s`. `append('/src', 'foo bar baz')` →
+  `'foo/src bar/src baz/src'`
 - `prepend(prefix, s)`<sup>1.27.0</sup> - Prepend `prefix` to
   whitespace-separated strings in `s`. `prepend('src/', 'foo bar baz')` →
   `'src/foo src/bar src/baz'`

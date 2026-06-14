@@ -108,26 +108,32 @@ module        : 'mod' '?'? NAME string? eol
 expression    : disjunct || expression
               | disjunct
 
-disjunct      : conjunct && disjunct
+disjunct      : comparison && disjunct
+              | comparison
+
+comparison    : conjunct '==' conjunct
+              | conjunct '!=' conjunct
+              | conjunct '=~' conjunct
+              | conjunct '!~' conjunct
               | conjunct
 
-conjunct      : 'if' condition '{' expression '}' 'else' '{' expression '}'
-              | 'assert' '(' condition ',' expression ')'
+conjunct      : 'if' expression '{' expression '}' 'else' '{' expression '}'
+              | 'assert' '(' expression ',' expression ')'
               | '/' expression
               | value '/' expression
               | value '+' expression
               | value
 
-condition     : expression '==' expression
-              | expression '!=' expression
-              | expression '=~' expression
-
-value         : NAME '(' sequence? ')'
+value         : '!' value
+              | NAME '(' sequence? ')'
               | BACKTICK
               | INDENTED_BACKTICK
               | NAME
+              | list
               | string
               | '(' expression ')'
+
+list          : '[' (expression (',' expression)* ','?)? ']'
 
 string        : 'x'? STRING
               | 'x'? INDENTED_STRING

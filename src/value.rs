@@ -18,39 +18,40 @@ impl Value {
     self.elements.push(element.into());
   }
 
-  pub(crate) fn join(&self) -> Cow<'_, str> {
-    match self.elements.as_slice() {
-      [element] => Cow::Borrowed(element),
-      elements => Cow::Owned(elements.join(" ")),
-    }
+  pub(crate) fn join(&self) -> String {
+    self.elements.join(" ")
   }
 
-  pub(crate) fn into_string(self) -> String {
-    if self.elements.len() == 1 {
-      self.elements.into_iter().next().unwrap()
-    } else {
-      self.elements.join(" ")
-    }
+  pub(crate) fn into_elements(self) -> Vec<String> {
+    self.elements
   }
 
   pub(crate) fn is_empty(&self) -> bool {
-    match self.elements.as_slice() {
-      [] => true,
-      [element] => element.is_empty(),
-      _ => false,
-    }
+    self.elements.is_empty()
+  }
+
+  pub(crate) fn is_truthy(&self) -> bool {
+    !self.elements.is_empty()
   }
 }
 
-impl Display for Value {
-  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    for (i, element) in self.elements.iter().enumerate() {
-      if i > 0 {
-        write!(f, " ")?;
+impl ColorDisplay for Value {
+  fn fmt(&self, f: &mut Formatter, color: Color) -> fmt::Result {
+    if self.elements.len() == 1 {
+      write!(f, "{}", Element(&self.elements[0]).color_display(color))
+    } else {
+      write!(f, "[")?;
+
+      for (i, element) in self.elements.iter().enumerate() {
+        if i > 0 {
+          write!(f, ", ")?;
+        }
+
+        write!(f, "{}", Element(element).color_display(color))?;
       }
-      write!(f, "{element}")?;
+
+      write!(f, "]")
     }
-    Ok(())
   }
 }
 
@@ -71,6 +72,16 @@ impl From<&String> for Value {
   }
 }
 
+impl From<bool> for Value {
+  fn from(condition: bool) -> Self {
+    if condition {
+      "true".into()
+    } else {
+      Self::new()
+    }
+  }
+}
+
 impl From<&str> for Value {
   fn from(element: &str) -> Self {
     element.to_string().into()
@@ -82,6 +93,12 @@ impl From<String> for Value {
     Self {
       elements: vec![element],
     }
+  }
+}
+
+impl From<Vec<String>> for Value {
+  fn from(elements: Vec<String>) -> Self {
+    Self { elements }
   }
 }
 
@@ -103,8 +120,6 @@ mod tests {
     fn case(elements: &[&str], expected: &str) {
       let value = elements.iter().map(ToString::to_string).collect::<Value>();
       assert_eq!(value.join(), expected);
-      assert_eq!(value.to_string(), expected);
-      assert_eq!(value.clone().into_string(), expected);
       assert_eq!(
         serde_json::to_string(&value).unwrap(),
         format!("{expected:?}")
@@ -120,18 +135,43 @@ mod tests {
   }
 
   #[test]
-  fn is_empty() {
+  fn display() {
+    #[track_caller]
+    fn case(elements: &[&str], expected: &str) {
+      let value = elements.iter().map(ToString::to_string).collect::<Value>();
+      assert_eq!(value.color_display(Color::never()).to_string(), expected);
+    }
+
+    case(&[], "[]");
+    case(&["foo"], r#""foo""#);
+    case(&["foo", "bar"], r#"["foo", "bar"]"#);
+    case(&["a\tb\"c"], r#""a\tb\"c""#);
+    case(&["\\", "\n"], r#"["\\", "\n"]"#);
+  }
+
+  #[test]
+  fn color_display() {
+    assert_eq!(
+      Value::from("abc\t\r\nxyz")
+        .color_display(Color::always())
+        .to_string(),
+      "\u{1b}[32m\"abc\u{1b}[36m\\t\\r\\n\u{1b}[32mxyz\"\u{1b}[0m",
+    );
+  }
+
+  #[test]
+  fn is_truthy() {
     #[track_caller]
     fn case(elements: &[&str], expected: bool) {
       let value = elements.iter().map(ToString::to_string).collect::<Value>();
-      assert_eq!(value.is_empty(), expected);
+      assert_eq!(value.is_truthy(), expected);
     }
 
-    case(&[], true);
+    case(&[], false);
     case(&[""], true);
-    case(&["foo"], false);
-    case(&["", ""], false);
-    case(&["foo", "bar"], false);
+    case(&["foo"], true);
+    case(&["", ""], true);
+    case(&["foo", "bar"], true);
   }
 
   #[test]

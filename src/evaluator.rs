@@ -302,17 +302,31 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     function: Function,
     arguments: &[Expression<'src>],
   ) -> RunResult<'src, Value> {
+    macro_rules! context {
+      () => {
+        self.function_context(name).unwrap()
+      };
+    }
     match function {
-      Function::Nullary(f) => f(self.function_context(name).unwrap()).map(Value::from),
+      Function::Nullary(f) => f(context!()).map(Value::from),
+      Function::NullaryValue(f) => f(context!()),
       Function::Unary(f) => {
         let a = self.evaluate_string(&arguments[0])?;
-        f(self.function_context(name).unwrap(), &a).map(Value::from)
+        f(context!(), &a).map(Value::from)
+      }
+      Function::UnaryValue(f) => {
+        let a = self.evaluate_string(&arguments[0])?;
+        f(context!(), &a)
       }
       Function::UnaryList(f) => {
         let a = self.evaluate_value(&arguments[0])?;
+        f(context!(), &a)
+      }
+      Function::UnaryMap(f) => {
+        let a = self.evaluate_value(&arguments[0])?;
         a.elements()
           .iter()
-          .map(|element| f(self.function_context(name).unwrap(), element))
+          .map(|element| f(context!(), element))
           .collect()
       }
       Function::UnaryOpt(f) => {
@@ -322,7 +336,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         } else {
           None
         };
-        f(self.function_context(name).unwrap(), &a, b.as_deref()).map(Value::from)
+        f(context!(), &a, b.as_deref()).map(Value::from)
       }
       Function::UnaryPlus(f) => {
         let a = self.evaluate_string(&arguments[0])?;
@@ -330,17 +344,22 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         for arg in &arguments[1..] {
           rest.push(self.evaluate_string(arg)?);
         }
-        f(self.function_context(name).unwrap(), &a, &rest).map(Value::from)
+        f(context!(), &a, &rest).map(Value::from)
       }
       Function::BinaryList(f) => {
         let a = self.evaluate_value(&arguments[0])?;
         let b = self.evaluate_value(&arguments[1])?;
-        f(self.function_context(name).unwrap(), &a, &b)
+        f(context!(), &a, &b)
       }
       Function::Binary(f) => {
         let a = self.evaluate_string(&arguments[0])?;
         let b = self.evaluate_string(&arguments[1])?;
-        f(self.function_context(name).unwrap(), &a, &b).map(Value::from)
+        f(context!(), &a, &b).map(Value::from)
+      }
+      Function::BinaryValue(f) => {
+        let a = self.evaluate_string(&arguments[0])?;
+        let b = self.evaluate_string(&arguments[1])?;
+        f(context!(), &a, &b)
       }
       Function::BinaryPlus(f) => {
         let a = self.evaluate_string(&arguments[0])?;
@@ -349,13 +368,13 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         for arg in &arguments[2..] {
           rest.push(self.evaluate_string(arg)?);
         }
-        f(self.function_context(name).unwrap(), &a, &b, &rest).map(Value::from)
+        f(context!(), &a, &b, &rest).map(Value::from)
       }
       Function::Ternary(f) => {
         let a = self.evaluate_string(&arguments[0])?;
         let b = self.evaluate_string(&arguments[1])?;
         let c = self.evaluate_string(&arguments[2])?;
-        f(self.function_context(name).unwrap(), &a, &b, &c).map(Value::from)
+        f(context!(), &a, &b, &c).map(Value::from)
       }
     }
     .map_err(|message| Error::FunctionCall {
@@ -368,24 +387,25 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     &mut self,
     expression: &Expression<'src>,
   ) -> RunResult<'src, String> {
-    Ok(self.evaluate_value(expression)?.into_string())
+    Ok(self.evaluate_value(expression)?.join())
   }
 
   pub(crate) fn evaluate_value(&mut self, expression: &Expression<'src>) -> RunResult<'src, Value> {
     match expression {
       Expression::And { lhs, rhs } => {
         let lhs = self.evaluate_value(lhs)?;
-        if lhs.is_empty() {
-          return Ok(Value::from(""));
+        if lhs.is_truthy() {
+          self.evaluate_value(rhs)
+        } else {
+          Ok(Value::new())
         }
-        self.evaluate_value(rhs)
       }
       Expression::Assert {
         condition,
         error,
         name,
       } => {
-        if self.evaluate_condition(condition)? {
+        if self.evaluate_boolean(condition)? {
           Ok(Value::from(""))
         } else {
           Err(Error::Assert {
@@ -418,6 +438,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           unreachable!();
         }
       }
+      Expression::Comparison { .. } => Ok(self.evaluate_boolean(expression)?.into()),
       Expression::Concatenation { lhs, rhs } => {
         let lhs = self.evaluate_string(lhs)?;
         let rhs = self.evaluate_string(rhs)?;
@@ -428,7 +449,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         then,
         otherwise,
       } => {
-        if self.evaluate_condition(condition)? {
+        if self.evaluate_boolean(condition)? {
           self.evaluate_value(then)
         } else {
           self.evaluate_value(otherwise)
@@ -460,12 +481,21 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         let rhs = self.evaluate_string(rhs)?;
         Ok((lhs + "/" + &rhs).into())
       }
+      Expression::List { elements } => {
+        let mut values = Vec::new();
+        for element in elements {
+          values.extend(self.evaluate_value(element)?.into_elements());
+        }
+        Ok(values.into())
+      }
+      Expression::Not { operand } => Ok((!self.evaluate_value(operand)?.is_truthy()).into()),
       Expression::Or { lhs, rhs } => {
         let lhs = self.evaluate_value(lhs)?;
-        if !lhs.is_empty() {
-          return Ok(lhs);
+        if lhs.is_truthy() {
+          Ok(lhs)
+        } else {
+          self.evaluate_value(rhs)
         }
-        self.evaluate_value(rhs)
       }
       Expression::StringLiteral { string_literal } => Ok(string_literal.cooked.deref().into()),
       Expression::Variable { name, .. } => {
@@ -488,10 +518,13 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     }
   }
 
-  fn evaluate_condition(&mut self, condition: &Condition<'src>) -> RunResult<'src, bool> {
-    let lhs_value = self.evaluate_string(&condition.lhs)?;
-    let rhs_value = self.evaluate_string(&condition.rhs)?;
-    let condition = match condition.operator {
+  fn evaluate_boolean(&mut self, condition: &Expression<'src>) -> RunResult<'src, bool> {
+    let Expression::Comparison { lhs, operator, rhs } = condition else {
+      return Ok(self.evaluate_value(condition)?.is_truthy());
+    };
+    let lhs_value = self.evaluate_string(lhs)?;
+    let rhs_value = self.evaluate_string(rhs)?;
+    let condition = match operator {
       ConditionalOperator::Equality => lhs_value == rhs_value,
       ConditionalOperator::Inequality => lhs_value != rhs_value,
       ConditionalOperator::RegexMatch => Regex::new(&rhs_value)
@@ -626,13 +659,13 @@ impl<'src, 'run> Evaluator<'src, 'run> {
       if parameter.kind.is_variadic() {
         positional.extend(value.elements().iter().cloned());
       } else {
-        positional.push(value.join().into_owned());
+        positional.push(value.join());
       }
 
       let value = if context.module.settings.lists {
         value
       } else {
-        value.into_string().into()
+        value.join().into()
       };
 
       evaluator.scope.bind(Binding {

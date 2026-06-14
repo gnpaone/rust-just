@@ -28,10 +28,12 @@ pub(crate) struct Parser<'run, 'src> {
   file_depth: u32,
   import_offsets: Vec<usize>,
   items: Vec<Item<'src>>,
+  list_feature: Option<(ListFeature, Token<'src>)>,
   module_namepath: Option<&'run Namepath<'src>>,
   next_token: usize,
   numerator: &'run mut Numerator,
   recursion_depth: usize,
+  restricted_functions: Vec<(RestrictedFunction, Token<'src>)>,
   tokens: &'run [Token<'src>],
   unstable_features: BTreeSet<UnstableFeature>,
   working_directory: &'run Path,
@@ -52,10 +54,12 @@ impl<'run, 'src> Parser<'run, 'src> {
       file_depth,
       import_offsets: import_offsets.to_vec(),
       items: Vec::new(),
+      list_feature: None,
       module_namepath,
       next_token: 0,
       numerator,
       recursion_depth: 0,
+      restricted_functions: Vec::new(),
       tokens,
       unstable_features: BTreeSet::new(),
       working_directory,
@@ -91,6 +95,18 @@ impl<'run, 'src> Parser<'run, 'src> {
 
   fn error(&self, kind: CompileErrorKind<'src>) -> CompileResult<'src, CompileError<'src>> {
     Ok(self.next()?.error(kind))
+  }
+
+  fn list_feature(&mut self, list_feature: ListFeature, token: Token<'src>) {
+    if self.list_feature.is_none() {
+      self.list_feature = Some((list_feature, token));
+    }
+  }
+
+  fn restricted_function(&mut self, restricted_function: RestrictedFunction, name: Name<'src>) {
+    self
+      .restricted_functions
+      .push((restricted_function, name.token));
   }
 
   /// Construct an unexpected token error with the token returned by
@@ -477,7 +493,9 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     Ok(Ast {
       items: self.items,
+      list_feature: self.list_feature,
       module_path: self.module_namepath.map(Into::into).unwrap_or_default(),
+      restricted_functions: self.restricted_functions,
       unstable_features: self.unstable_features,
       warnings: Vec::new(),
       working_directory: self.working_directory.into(),
@@ -686,6 +704,13 @@ impl<'run, 'src> Parser<'run, 'src> {
 
   /// Parse an expression, e.g. `1 + 2`
   fn parse_expression(&mut self) -> CompileResult<'src, Expression<'src>> {
+    self.parse_expression_with_condition(false)
+  }
+
+  fn parse_expression_with_condition(
+    &mut self,
+    condition: bool,
+  ) -> CompileResult<'src, Expression<'src>> {
     if self.recursion_depth == RECURSION_LIMIT {
       let token = self.next()?;
       return Err(CompileError::new(
@@ -696,14 +721,12 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     self.recursion_depth += 1;
 
-    let disjunct = self.parse_disjunct()?;
+    let disjunct = self.parse_disjunct(condition)?;
 
-    let expression = if self.accepted(BarBar)? {
-      self
-        .unstable_features
-        .insert(UnstableFeature::LogicalOperators);
+    let expression = if let Some(token) = self.accept(BarBar)? {
+      self.list_feature(ListFeature::LogicalOperator, token);
       let lhs = disjunct.into();
-      let rhs = self.parse_expression()?.into();
+      let rhs = self.parse_expression_with_condition(false)?.into();
       Expression::Or { lhs, rhs }
     } else {
       disjunct
@@ -714,21 +737,47 @@ impl<'run, 'src> Parser<'run, 'src> {
     Ok(expression)
   }
 
-  fn parse_disjunct(&mut self) -> CompileResult<'src, Expression<'src>> {
-    let conjunct = self.parse_conjunct()?;
+  fn parse_disjunct(&mut self, condition: bool) -> CompileResult<'src, Expression<'src>> {
+    let conjunct = self.parse_comparison(condition)?;
 
-    let disjunct = if self.accepted(AmpersandAmpersand)? {
-      self
-        .unstable_features
-        .insert(UnstableFeature::LogicalOperators);
+    let expression = if let Some(token) = self.accept(AmpersandAmpersand)? {
+      self.list_feature(ListFeature::LogicalOperator, token);
       let lhs = conjunct.into();
-      let rhs = self.parse_disjunct()?.into();
+      let rhs = self.parse_disjunct(false)?.into();
       Expression::And { lhs, rhs }
     } else {
       conjunct
     };
 
-    Ok(disjunct)
+    Ok(expression)
+  }
+
+  fn parse_comparison(&mut self, condition: bool) -> CompileResult<'src, Expression<'src>> {
+    let lhs = self.parse_conjunct()?;
+
+    let (token, operator) = if let Some(token) = self.accept(BangEquals)? {
+      (token, ConditionalOperator::Inequality)
+    } else if let Some(token) = self.accept(EqualsTilde)? {
+      (token, ConditionalOperator::RegexMatch)
+    } else if let Some(token) = self.accept(BangTilde)? {
+      (token, ConditionalOperator::RegexMismatch)
+    } else if let Some(token) = self.accept(EqualsEquals)? {
+      (token, ConditionalOperator::Equality)
+    } else {
+      return Ok(lhs);
+    };
+
+    if !condition {
+      self.list_feature(ListFeature::ComparisonOperator, token);
+    }
+
+    let rhs = self.parse_conjunct()?;
+
+    Ok(Expression::Comparison {
+      lhs: lhs.into(),
+      operator,
+      rhs: rhs.into(),
+    })
   }
 
   fn parse_conjunct(&mut self) -> CompileResult<'src, Expression<'src>> {
@@ -777,30 +826,20 @@ impl<'run, 'src> Parser<'run, 'src> {
     };
 
     Ok(Expression::Conditional {
-      condition,
+      condition: condition.into(),
       then: then.into(),
       otherwise: otherwise.into(),
     })
   }
 
-  fn parse_condition(&mut self) -> CompileResult<'src, Condition<'src>> {
-    let lhs = self.parse_expression()?;
-    let operator = if self.accepted(BangEquals)? {
-      ConditionalOperator::Inequality
-    } else if self.accepted(EqualsTilde)? {
-      ConditionalOperator::RegexMatch
-    } else if self.accepted(BangTilde)? {
-      ConditionalOperator::RegexMismatch
-    } else {
-      self.expect(EqualsEquals)?;
-      ConditionalOperator::Equality
-    };
-    let rhs = self.parse_expression()?;
-    Ok(Condition {
-      lhs: lhs.into(),
-      rhs: rhs.into(),
-      operator,
-    })
+  /// Parse the condition of an `if` or `assert`
+  fn parse_condition(&mut self) -> CompileResult<'src, Expression<'src>> {
+    let token = self.next()?;
+    let condition = self.parse_expression_with_condition(true)?;
+    if !matches!(condition, Expression::Comparison { .. }) {
+      self.list_feature(ListFeature::NonComparisonCondition, token);
+    }
+    Ok(condition)
   }
 
   fn parse_format_string(&mut self) -> CompileResult<'src, Expression<'src>> {
@@ -866,7 +905,12 @@ impl<'run, 'src> Parser<'run, 'src> {
 
   /// Parse a value, e.g. `(bar)`
   fn parse_value(&mut self) -> CompileResult<'src, Expression<'src>> {
-    if self.next_is(StringToken) || self.next_is_shell_expanded_string() {
+    if let Some(token) = self.accept(Bang)? {
+      self.list_feature(ListFeature::NegationOperator, token);
+      Ok(Expression::Not {
+        operand: self.parse_value()?.into(),
+      })
+    } else if self.next_is(StringToken) || self.next_is_shell_expanded_string() {
       Ok(Expression::StringLiteral {
         string_literal: self.parse_string_literal()?,
       })
@@ -891,7 +935,7 @@ impl<'run, 'src> Parser<'run, 'src> {
     } else if self.next_is(Identifier) {
       if let Some(name) = self.accept_keyword(Keyword::Assert)? {
         self.expect(ParenL)?;
-        let condition = self.parse_condition()?;
+        let condition = Box::new(self.parse_condition()?);
         self.expect(Comma)?;
         let error = Box::new(self.parse_expression()?);
         self.expect(ParenR)?;
@@ -905,10 +949,20 @@ impl<'run, 'src> Parser<'run, 'src> {
 
         if self.next_is(ParenL) {
           let arguments = self.parse_sequence()?;
-          if name.lexeme() == "which" {
-            self
-              .unstable_features
-              .insert(UnstableFeature::WhichFunction);
+          match name.lexeme() {
+            "bool" => {
+              self.restricted_function(RestrictedFunction::List(ListFeature::BoolFunction), name);
+            }
+            "show" => {
+              self.restricted_function(RestrictedFunction::List(ListFeature::ShowFunction), name);
+            }
+            "which" => {
+              self.restricted_function(
+                RestrictedFunction::Unstable(UnstableFeature::WhichFunction),
+                name,
+              );
+            }
+            _ => {}
           }
           Ok(Expression::Call { name, arguments })
         } else {
@@ -920,9 +974,32 @@ impl<'run, 'src> Parser<'run, 'src> {
       let contents = self.parse_expression()?.into();
       self.expect(ParenR)?;
       Ok(Expression::Group { contents })
+    } else if self.next_is(BracketL) {
+      self.parse_list()
     } else {
       Err(self.unexpected_token()?)
     }
+  }
+
+  /// Parse a list literal, e.g. `[a, b, c]`
+  fn parse_list(&mut self) -> CompileResult<'src, Expression<'src>> {
+    let bracket = self.presume(BracketL)?;
+
+    self.list_feature(ListFeature::ListLiteral, bracket);
+
+    let mut elements = Vec::new();
+
+    while !self.next_is(BracketR) {
+      elements.push(self.parse_expression()?);
+
+      if !self.accepted(Comma)? {
+        break;
+      }
+    }
+
+    self.expect(BracketR)?;
+
+    Ok(Expression::List { elements })
   }
 
   /// Parse a string literal, e.g. `"FOO"`
@@ -2761,43 +2838,79 @@ mod tests {
   test! {
     name: conditional,
     text: "a := if b == c { d } else { e }",
-    tree: (justfile (assignment a (if b == c d e))),
+    tree: (justfile (assignment a (if (== b c) d e))),
   }
 
   test! {
     name: conditional_inverted,
     text: "a := if b != c { d } else { e }",
-    tree: (justfile (assignment a (if b != c d e))),
+    tree: (justfile (assignment a (if (!= b c) d e))),
   }
 
   test! {
     name: conditional_concatenations,
     text: "a := if b0 + b1 == c0 + c1 { d0 + d1 } else { e0 + e1 }",
-    tree: (justfile (assignment a (if (+ b0 b1) == (+ c0 c1) (+ d0 d1) (+ e0 e1)))),
+    tree: (justfile (assignment a (if (== (+ b0 b1) (+ c0 c1)) (+ d0 d1) (+ e0 e1)))),
   }
 
   test! {
     name: conditional_nested_lhs,
     text: "a := if if b == c { d } else { e } == c { d } else { e }",
-    tree: (justfile (assignment a (if (if b == c d e) == c d e))),
+    tree: (justfile (assignment a (if (== (if (== b c) d e) c) d e))),
   }
 
   test! {
     name: conditional_nested_rhs,
     text: "a := if c == if b == c { d } else { e } { d } else { e }",
-    tree: (justfile (assignment a (if c == (if b == c d e) d e))),
+    tree: (justfile (assignment a (if (== c (if (== b c) d e)) d e))),
   }
 
   test! {
     name: conditional_nested_then,
     text: "a := if b == c { if b == c { d } else { e } } else { e }",
-    tree: (justfile (assignment a (if b == c (if b == c d e) e))),
+    tree: (justfile (assignment a (if (== b c) (if (== b c) d e) e))),
   }
 
   test! {
     name: conditional_nested_otherwise,
     text: "a := if b == c { d } else { if b == c { d } else { e } }",
-    tree: (justfile (assignment a (if b == c d (if b == c d e)))),
+    tree: (justfile (assignment a (if (== b c) d (if (== b c) d e)))),
+  }
+
+  test! {
+    name: comparison,
+    text: "a := b == c",
+    tree: (justfile (assignment a (== b c))),
+  }
+
+  test! {
+    name: comparison_binds_looser_than_concatenation,
+    text: "a := b + c == d + e",
+    tree: (justfile (assignment a (== (+ b c) (+ d e)))),
+  }
+
+  test! {
+    name: comparison_binds_tighter_than_logical_operators,
+    text: "a := b == c && d == e || f == g",
+    tree: (justfile (assignment a (|| (&& (== b c) (== d e)) (== f g)))),
+  }
+
+  test! {
+    name: negation,
+    text: "a := !b",
+    tree: (justfile (assignment a (! b))),
+  }
+
+  test! {
+    name: negation_binds_tighter_than_comparison,
+    text: "a := !b == c",
+    tree: (justfile (assignment a (== (! b) c))),
+  }
+
+  test! {
+    name: double_negation,
+    text: "a := !!b",
+    tree: (justfile (assignment a (! (! b)))),
   }
 
   test! {
@@ -2839,13 +2952,13 @@ mod tests {
   test! {
     name: assert,
     text: "a := assert(foo == \"bar\", \"error\")",
-    tree: (justfile (assignment a (assert foo == "bar" "error"))),
+    tree: (justfile (assignment a (assert (== foo "bar") "error"))),
   }
 
   test! {
     name: assert_conditional_condition,
     text: "foo := assert(if a != b { c } else { d } == \"abc\", \"error\")",
-    tree: (justfile (assignment foo (assert (if a != b c d) == "abc" "error"))),
+    tree: (justfile (assignment foo (assert (== (if (!= a b) c d) "abc") "error"))),
   }
 
   test! {
@@ -2932,6 +3045,8 @@ mod tests {
     kind:   UnexpectedToken {
       expected: vec![
         Backtick,
+        Bang,
+        BracketL,
         Identifier,
         ParenL,
         StringToken,
@@ -2950,6 +3065,8 @@ mod tests {
     kind:   UnexpectedToken {
       expected: vec![
         Backtick,
+        Bang,
+        BracketL,
         Identifier,
         ParenL,
         StringToken,
@@ -3004,6 +3121,8 @@ mod tests {
     kind: UnexpectedToken{
       expected: vec![
         Backtick,
+        Bang,
+        BracketL,
         Identifier,
         ParenL,
         ParenR,
@@ -3087,6 +3206,8 @@ mod tests {
     kind:   UnexpectedToken {
       expected: vec![
         Backtick,
+        Bang,
+        BracketL,
         Identifier,
         ParenL,
         Slash,
@@ -3106,6 +3227,8 @@ mod tests {
     kind:   UnexpectedToken {
       expected: vec![
         Backtick,
+        Bang,
+        BracketL,
         BracketR,
         Identifier,
         ParenL,
@@ -3124,7 +3247,18 @@ mod tests {
     column: 20,
     width:  0,
     kind:   UnexpectedToken {
-      expected: vec![AmpersandAmpersand, BarBar, BracketR, Comma, Plus, Slash],
+      expected: vec![
+        AmpersandAmpersand,
+        BangEquals,
+        BangTilde,
+        BarBar,
+        BracketR,
+        Comma,
+        EqualsEquals,
+        EqualsTilde,
+        Plus,
+        Slash,
+      ],
       found: Eof,
     },
   }

@@ -747,6 +747,65 @@ fn prepend() {
 }
 
 #[test]
+fn show_string() {
+  assert_list_eq(r#""foo""#, r#""foo""#);
+}
+
+#[test]
+fn show_escapes_contents() {
+  assert_list_eq(r#""a\tb\"c""#, r#""a\tb\"c""#);
+}
+
+#[test]
+fn show_requires_lists_setting() {
+  Test::new()
+    .justfile(r#"x := show("foo")"#)
+    .args(["--evaluate", "x"])
+    .stderr(
+      r#"
+        error: the `show()` function requires `set lists`
+         ——▶ justfile:1:6
+          │
+        1 │ x := show("foo")
+          │      ^^^^
+      "#,
+    )
+    .failure();
+}
+
+#[test]
+fn show_list() {
+  Test::new()
+    .justfile(
+      r#"
+        set lists
+
+        x := show(["foo", "bar baz", "qux"])
+      "#,
+    )
+    .env("JUST_UNSTABLE", "1")
+    .args(["--evaluate", "x"])
+    .stdout(r#"["foo", "bar baz", "qux"]"#)
+    .success();
+}
+
+#[test]
+fn show_empty_list() {
+  Test::new()
+    .justfile(
+      r"
+        set lists
+
+        x := show([])
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .args(["--evaluate", "x"])
+    .stdout("[]")
+    .success();
+}
+
+#[test]
 fn join_unix() {
   if cfg!(windows) {
     return;

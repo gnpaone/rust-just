@@ -54,22 +54,22 @@ fn subsequents_may_be_mapped() {
 fn mapped_dependencies_may_take_unstarred_arguments() {
   Test::new()
     .justfile(
-      r#"
+      "
         set lists
 
         foo *args: *(bar args *args)
 
         bar all arg:
-          @echo "all: {{ quote(all) }} arg: {{ arg }}"
-      "#,
+          @echo 'all: {{ show(all) }} arg: {{ show(arg )}}'
+      ",
     )
     .env("JUST_UNSTABLE", "1")
     .args(["foo", "baz", "bob"])
     .stdout(
-      "
-        all: 'baz' 'bob' arg: baz
-        all: 'baz' 'bob' arg: bob
-      ",
+      r#"
+        all: ["baz", "bob"] arg: "baz"
+        all: ["baz", "bob"] arg: "bob"
+      "#,
     )
     .success();
 }
@@ -172,7 +172,7 @@ fn starred_arguments_require_value() {
     .arg("foo")
     .stderr(
       "
-        error: expected '*', backtick, identifier, '(', ')', '/', or string, but found '+'
+        error: expected '*', backtick, '!', '[', identifier, '(', ')', '/', or string, but found '+'
          ——▶ justfile:3:24
           │
         3 │ foo *args: *(bar *args + 'bob')

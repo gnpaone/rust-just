@@ -6,7 +6,9 @@ use super::*;
 #[derive(Debug, Clone)]
 pub(crate) struct Ast<'src> {
   pub(crate) items: Vec<Item<'src>>,
+  pub(crate) list_feature: Option<(ListFeature, Token<'src>)>,
   pub(crate) module_path: Modulepath,
+  pub(crate) restricted_functions: Vec<(RestrictedFunction, Token<'src>)>,
   pub(crate) unstable_features: BTreeSet<UnstableFeature>,
   pub(crate) warnings: Vec<Warning>,
   pub(crate) working_directory: PathBuf,

@@ -225,13 +225,14 @@ impl Display for CompileError<'_> {
           _ => character.escape_default().collect(),
         }
       ),
+      ListFeature(feature) => write!(f, "{feature}"),
       MappedDependencyMultipleStarredArguments => {
         write!(
           f,
           "mapped dependencies may not have multiple starred arguments"
         )
       }
-      MappedDependencyWithoutListSetting => {
+      MappedDependencyWithoutListsSetting => {
         write!(f, "mapped dependencies require `set lists`")
       }
       MappedDependencyWithoutStarredArgument => {
