@@ -146,7 +146,9 @@ impl<'src> Node<'src> for Expression<'src> {
         let mut tree = Tree::atom(Keyword::If.lexeme());
         tree.push_mut(condition.tree());
         tree.push_mut(then.tree());
-        tree.push_mut(otherwise.tree());
+        if let Some(otherwise) = otherwise {
+          tree.push_mut(otherwise.tree());
+        }
         tree
       }
       Self::FormatString { start, expressions } => {
@@ -164,7 +166,7 @@ impl<'src> Node<'src> for Expression<'src> {
         lhs: Some(lhs),
         rhs,
       } => Tree::atom("/").push(lhs.tree()).push(rhs.tree()),
-      Self::List { elements } => {
+      Self::List { elements, .. } => {
         let mut tree = Tree::atom("list");
         for element in elements {
           tree.push_mut(element.tree());

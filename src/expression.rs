@@ -38,7 +38,7 @@ pub(crate) enum Expression<'src> {
   Conditional {
     condition: Box<Self>,
     then: Box<Self>,
-    otherwise: Box<Self>,
+    otherwise: Option<Box<Self>>,
   },
   // `f"format string"`
   FormatString {
@@ -53,7 +53,10 @@ pub(crate) enum Expression<'src> {
     rhs: Box<Self>,
   },
   /// `[a, b, c]`
-  List { elements: Vec<Expression<'src>> },
+  List {
+    elements: Vec<Expression<'src>>,
+    open: Token<'src>,
+  },
   /// `!operand`
   Not { operand: Box<Self> },
   /// `lhs || rhs`
@@ -67,6 +70,25 @@ pub(crate) enum Expression<'src> {
 impl<'src> Expression<'src> {
   pub(crate) fn references<'a>(&'a self) -> References<'a, 'src> {
     References::new(self)
+  }
+
+  pub(crate) fn token(&self) -> Token<'src> {
+    match self {
+      Self::And { lhs, .. }
+      | Self::Comparison { lhs, .. }
+      | Self::Concatenation { lhs, .. }
+      | Self::Join { lhs: Some(lhs), .. }
+      | Self::Or { lhs, .. } => lhs.token(),
+      Self::Assert { name, .. } | Self::Call { name, .. } | Self::Variable { name } => name.token,
+      Self::Backtick { token, .. } => *token,
+      Self::Conditional { condition, .. } => condition.token(),
+      Self::FormatString { start, .. } => start.token,
+      Self::Group { contents } => contents.token(),
+      Self::Join { lhs: None, rhs } => rhs.token(),
+      Self::List { open, .. } => *open,
+      Self::Not { operand } => operand.token(),
+      Self::StringLiteral { string_literal } => string_literal.token,
+    }
   }
 }
 
@@ -95,11 +117,15 @@ impl Display for Expression<'_> {
         then,
         otherwise,
       } => {
-        if let Self::Conditional { .. } = **otherwise {
-          write!(f, "if {condition} {{ {then} }} else {otherwise}")
-        } else {
-          write!(f, "if {condition} {{ {then} }} else {{ {otherwise} }}")
+        write!(f, "if {condition} {{ {then} }}")?;
+        if let Some(otherwise) = otherwise {
+          if let Self::Conditional { .. } = **otherwise {
+            write!(f, " else {otherwise}")?;
+          } else {
+            write!(f, " else {{ {otherwise} }}")?;
+          }
         }
+        Ok(())
       }
       Self::FormatString { start, expressions } => {
         write!(f, "{start}")?;
@@ -116,7 +142,7 @@ impl Display for Expression<'_> {
         lhs: Some(lhs),
         rhs,
       } => write!(f, "{lhs} / {rhs}"),
-      Self::List { elements } => {
+      Self::List { elements, .. } => {
         write!(f, "[")?;
         for (i, element) in elements.iter().enumerate() {
           if i > 0 {
@@ -215,7 +241,7 @@ impl Serialize for Expression<'_> {
         seq.serialize_element(rhs)?;
         seq.end()
       }
-      Self::List { elements } => {
+      Self::List { elements, .. } => {
         let mut seq = serializer.serialize_seq(None)?;
         seq.serialize_element("list")?;
         for element in elements {

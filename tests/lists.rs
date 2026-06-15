@@ -9,37 +9,13 @@ fn lists_setting_is_unstable() {
 }
 
 #[test]
-fn quote_quotes_each_element_of_variadic_arguments() {
-  Test::new()
-    .justfile(
-      r#"
-        set lists
-
-        foo *args:
-          @echo "{{ quote(args) }}"
-      "#,
-    )
-    .env("JUST_UNSTABLE", "1")
-    .args(["foo", "bar", "baz bob"])
-    .stdout("'bar' 'baz bob'\n")
-    .success();
+fn quote_quotes_each_element_of_a_list() {
+  assert_list_eq("quote(['bar', 'baz bob'])", r#"["'bar'", "'baz bob'"]"#);
 }
 
 #[test]
 fn quote_of_empty_list_is_empty() {
-  Test::new()
-    .justfile(
-      r#"
-        set lists
-
-        foo *args:
-          @echo "bar{{ quote(args) }}baz"
-      "#,
-    )
-    .env("JUST_UNSTABLE", "1")
-    .arg("foo")
-    .stdout("barbaz\n")
-    .success();
+  assert_list_eq("quote([])", "[]");
 }
 
 #[test]
@@ -58,34 +34,15 @@ fn quote_of_empty_variadic_is_empty_string_without_lists_setting() {
 
 #[test]
 fn quote_quotes_single_element_values_whole() {
-  Test::new()
-    .justfile(
-      r#"
-        set lists
-
-        foo bar='baz bob':
-          @echo "{{ quote(bar) }}"
-      "#,
-    )
-    .env("JUST_UNSTABLE", "1")
-    .arg("foo")
-    .stdout("'baz bob'\n")
-    .success();
+  assert_list_eq("quote('baz bob')", r#""'baz bob'""#);
 }
 
 #[test]
 fn absolute_path_resolves_each_element_of_a_list() {
   let test = Test::new()
-    .justfile(
-      r#"
-        set lists
-
-        foo *args:
-          @echo "{{ absolute_path(args) }}"
-      "#,
-    )
+    .justfile("set lists\n\nx := show(absolute_path(['bar', 'baz bob']))")
     .env("JUST_UNSTABLE", "1")
-    .args(["foo", "bar", "baz bob"]);
+    .args(["--evaluate", "x"]);
 
   let mut tempdir = test.tempdir.path().to_owned();
 
@@ -95,133 +52,46 @@ fn absolute_path_resolves_each_element_of_a_list() {
 
   test
     .stdout(format!(
-      "{} {}\n",
-      tempdir.join("bar").to_str().unwrap(),
-      tempdir.join("baz bob").to_str().unwrap(),
+      r#"["{}", "{}"]"#,
+      tempdir.join("bar").to_str().unwrap().replace('\\', "\\\\"),
+      tempdir
+        .join("baz bob")
+        .to_str()
+        .unwrap()
+        .replace('\\', "\\\\"),
     ))
+    .unindent_stdout(false)
     .success();
 }
 
 #[test]
 fn absolute_path_of_empty_list_is_empty() {
-  Test::new()
-    .justfile(
-      r#"
-        set lists
-
-        foo *args:
-          @echo "bar{{ absolute_path(args) }}baz"
-      "#,
-    )
-    .env("JUST_UNSTABLE", "1")
-    .arg("foo")
-    .stdout("barbaz\n")
-    .success();
+  assert_list_eq("absolute_path([])", "[]");
 }
 
 #[test]
 fn append_appends_to_each_element_of_a_list() {
-  Test::new()
-    .justfile(
-      r#"
-        set lists
-
-        foo *args:
-          @echo "{{ append('.c', args) }}"
-      "#,
-    )
-    .env("JUST_UNSTABLE", "1")
-    .args(["foo", "bar", "baz bob"])
-    .stdout("bar.c baz bob.c\n")
-    .success();
+  assert_list_eq(
+    "append('.c', ['bar', 'baz bob'])",
+    r#"["bar.c", "baz bob.c"]"#,
+  );
 }
 
 #[test]
 fn prepend_prepends_to_each_element_of_a_list() {
-  Test::new()
-    .justfile(
-      r#"
-        set lists
-
-        foo *args:
-          @echo "{{ prepend('src/', args) }}"
-      "#,
-    )
-    .env("JUST_UNSTABLE", "1")
-    .args(["foo", "bar", "baz bob"])
-    .stdout("src/bar src/baz bob\n")
-    .success();
-}
-
-#[test]
-fn prepend_errors_if_suffix_is_not_single_element() {
-  Test::new()
-    .justfile(
-      r#"
-        set lists
-
-        foo *args:
-          @echo "{{ prepend(args, 'bar') }}"
-      "#,
-    )
-    .env("JUST_UNSTABLE", "1")
-    .args(["foo", "bar", "baz"])
-    .stderr(
-      r#"
-        error: call to function `prepend` failed: `prefix` must be single element list but has 2 elements
-         ——▶ justfile:4:13
-          │
-        4 │   @echo "{{ prepend(args, 'bar') }}"
-          │             ^^^^^^^
-      "#,
-    )
-    .failure();
-}
-
-#[test]
-fn append_errors_if_suffix_is_not_single_element() {
-  Test::new()
-    .justfile(
-      r#"
-        set lists
-
-        foo *args:
-          @echo "{{ append(args, 'bar') }}"
-      "#,
-    )
-    .env("JUST_UNSTABLE", "1")
-    .args(["foo", "bar", "baz"])
-    .stderr(
-      r#"
-        error: call to function `append` failed: `suffix` must be single element list but has 2 elements
-         ——▶ justfile:4:13
-          │
-        4 │   @echo "{{ append(args, 'bar') }}"
-          │             ^^^^^^
-      "#,
-    )
-    .failure();
+  assert_list_eq(
+    "prepend('src/', ['bar', 'baz bob'])",
+    r#"["src/bar", "src/baz bob"]"#,
+  );
 }
 
 #[test]
 fn append_does_not_split_single_strings_with_lists_setting() {
-  Test::new()
-    .justfile(
-      r#"
-        set lists
-
-        foo:
-          @echo "{{ append('.c', 'foo bar') }}"
-      "#,
-    )
-    .env("JUST_UNSTABLE", "1")
-    .arg("foo")
-    .stdout("foo bar.c\n")
-    .success();
+  assert_list_eq("append('.c', 'foo bar')", r#""foo bar.c""#);
 }
 
 #[test]
-fn interpolations_join_lists_with_spaces() {
+fn recipe_interpolations_space_join_lists() {
   Test::new()
     .justfile(
       "
@@ -235,6 +105,33 @@ fn interpolations_join_lists_with_spaces() {
     .args(["foo", "bar", "baz"])
     .stdout("bar baz\n")
     .success();
+}
+
+#[test]
+fn fstring_interpolations_space_join_lists() {
+  assert_list_eq(r#"f"{{['bar', 'baz']}}""#, r#""bar baz""#);
+}
+
+#[test]
+fn join_list_joins_lists_with_spaces() {
+  assert_list_eq("join_list(['bar', 'baz'])", r#""bar baz""#);
+}
+
+#[test]
+fn join_list_requires_lists_setting() {
+  Test::new()
+    .justfile(r#"x := join_list("foo")"#)
+    .args(["--evaluate", "x"])
+    .stderr(
+      r#"
+        error: the `join_list()` function requires `set lists`
+         ——▶ justfile:1:6
+          │
+        1 │ x := join_list("foo")
+          │      ^^^^^^^^^
+      "#,
+    )
+    .failure();
 }
 
 #[test]
@@ -533,5 +430,127 @@ fn evaluate_prints_lists() {
         d := []
       "#,
     )
+    .success();
+}
+
+#[test]
+fn string_in_list_context_error() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        foo *args:
+          @echo {{ args + 'foo'}}
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .args(["foo", "bar", "baz"])
+    .stderr(
+      r#"
+        error: list value ["bar", "baz"] used as `+` operand
+        the ideal behavior of lists in many contexts is undecided
+        see https://github.com/casey/just#lists
+        note that the source location of this error may be inaccurate
+         ——▶ justfile:4:12
+          │
+        4 │   @echo {{ args + 'foo'}}
+          │            ^^^^
+      "#,
+    )
+    .failure();
+}
+
+#[test]
+fn assert_message_space_joins_lists() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        foo:
+          {{ assert('a' != 'a', ['foo', 'bar']) }}
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      "
+        error: assert failed: foo bar
+         ——▶ justfile:4:6
+          │
+        4 │   {{ assert('a' != 'a', ['foo', 'bar']) }}
+          │      ^^^^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn confirm_prompt_space_joins_lists() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        [confirm(['foo', 'bar'])]
+        @foo:
+          echo FOO
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr("foo bar ")
+    .stdout("FOO\n")
+    .stdin("y")
+    .success();
+}
+
+#[test]
+fn env_attribute_value_space_joins_lists() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        [env('FOO', ['bar', 'baz'])]
+        foo:
+          @echo $FOO
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stdout("bar baz\n")
+    .success();
+}
+
+#[test]
+fn env_attribute_empty_list_leaves_variable_unset() {
+  Test::new()
+    .justfile(
+      r#"
+        set lists
+
+        [env('FOO', [])]
+        foo:
+          @echo "[${FOO-unset}]"
+      "#,
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stdout("[unset]\n")
+    .success();
+}
+
+#[test]
+fn env_attribute_empty_string_sets_variable() {
+  Test::new()
+    .justfile(
+      r#"
+        set lists
+
+        [env('FOO', [''])]
+        foo:
+          @echo "[${FOO-unset}]"
+      "#,
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stdout("[]\n")
     .success();
 }
