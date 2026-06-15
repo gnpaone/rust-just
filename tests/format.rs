@@ -411,6 +411,28 @@ fn assignment_if_oneline() {
 }
 
 #[test]
+fn assignment_if_without_else() {
+  Test::new()
+    .arg("--dump")
+    .justfile(
+      "
+        set lists
+
+        foo := if 'foo' == 'foo' { 'foo' }
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stdout(
+      "
+        set lists
+
+        foo := if 'foo' == 'foo' { 'foo' }
+      ",
+    )
+    .success();
+}
+
+#[test]
 fn assignment_if_multiline() {
   Test::new()
     .arg("--dump")
@@ -1661,6 +1683,30 @@ fn arg_attribute_help() {
     .stdout(
       "
         [arg('bar', help='foo')]
+        @foo bar:
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn arg_attribute_flag() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        [arg('bar', long='bar', flag)]
+        @foo bar:
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .arg("--dump")
+    .stdout(
+      "
+        set lists
+
+        [arg('bar', long='bar', flag)]
         @foo bar:
       ",
     )

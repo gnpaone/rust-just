@@ -45,9 +45,11 @@ impl<'src> Iterator for References<'_, 'src> {
           then,
           otherwise,
         } => {
-          self.stack.push(otherwise);
           self.stack.push(then);
           self.stack.push(condition);
+          if let Some(otherwise) = otherwise {
+            self.stack.push(otherwise);
+          }
         }
         Expression::FormatString { expressions, .. } => {
           for (expression, _string) in expressions {
@@ -63,7 +65,7 @@ impl<'src> Iterator for References<'_, 'src> {
             self.stack.push(lhs);
           }
         }
-        Expression::List { elements } => {
+        Expression::List { elements, .. } => {
           for element in elements.iter().rev() {
             self.stack.push(element);
           }

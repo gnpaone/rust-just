@@ -21,6 +21,26 @@ fn inequality_false() {
 }
 
 #[test]
+fn list_equality_is_structural() {
+  assert_list_eq(r#"["foo", "bar"] == ["foo", "bar"]"#, TRUE);
+}
+
+#[test]
+fn equality_distinguishes_element_boundaries() {
+  assert_list_eq(r#"["foo", "bar"] == ["foo bar"]"#, FALSE);
+}
+
+#[test]
+fn inequality_distinguishes_element_boundaries() {
+  assert_list_eq(r#"["foo", "bar"] != ["foo bar"]"#, TRUE);
+}
+
+#[test]
+fn empty_list_does_not_equal_empty_string() {
+  assert_list_eq(r#"[] == """#, FALSE);
+}
+
+#[test]
 fn regex_match() {
   assert_list_eq(r#""foo" =~ "f.""#, TRUE);
 }
@@ -28,6 +48,36 @@ fn regex_match() {
 #[test]
 fn regex_mismatch() {
   assert_list_eq(r#""foo" !~ "b.""#, TRUE);
+}
+
+#[test]
+fn regex_match_is_true_if_any_element_matches() {
+  assert_list_eq(r#"["foo", "bar"] =~ "b.""#, TRUE);
+}
+
+#[test]
+fn regex_match_is_false_if_no_element_matches() {
+  assert_list_eq(r#"["foo", "bar"] =~ "z""#, FALSE);
+}
+
+#[test]
+fn regex_match_of_empty_list_is_false() {
+  assert_list_eq(r#"[] =~ ".""#, FALSE);
+}
+
+#[test]
+fn regex_mismatch_is_true_if_no_element_matches() {
+  assert_list_eq(r#"["foo", "bar"] !~ "z""#, TRUE);
+}
+
+#[test]
+fn regex_mismatch_is_false_if_any_element_matches() {
+  assert_list_eq(r#"["foo", "bar"] !~ "b.""#, FALSE);
+}
+
+#[test]
+fn regex_mismatch_of_empty_list_is_true() {
+  assert_list_eq(r#"[] !~ ".""#, TRUE);
 }
 
 #[test]

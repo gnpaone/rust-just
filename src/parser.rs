@@ -151,6 +151,14 @@ impl<'run, 'src> Parser<'run, 'src> {
     self.next_are(&[kind])
   }
 
+  /// Check if the next significant token is `keyword`
+  fn next_is_keyword(&self, keyword: Keyword) -> bool {
+    self
+      .rest()
+      .next()
+      .is_some_and(|token| token.kind == Identifier && token.lexeme() == keyword.lexeme())
+  }
+
   /// Check if the next significant tokens are of kinds `kinds`
   ///
   /// The first token in `kinds` will be added to the expected token set.
@@ -265,8 +273,8 @@ impl<'run, 'src> Parser<'run, 'src> {
   }
 
   /// Return an internal error if the next token is not of kind `Identifier`
-  /// with lexeme `lexeme`.
-  fn presume_keyword(&mut self, keyword: Keyword) -> CompileResult<'src> {
+  /// with lexeme `keyword`.
+  fn presume_keyword(&mut self, keyword: Keyword) -> CompileResult<'src, Token<'src>> {
     let next = self.advance()?;
 
     if next.kind != Identifier {
@@ -275,7 +283,7 @@ impl<'run, 'src> Parser<'run, 'src> {
         next.kind
       ))?)
     } else if keyword == next.lexeme() {
-      Ok(())
+      Ok(next)
     } else {
       Err(self.internal_error(format!(
         "presumed next token would have lexeme \"{keyword}\", but found \"{}\"",
@@ -781,7 +789,7 @@ impl<'run, 'src> Parser<'run, 'src> {
   }
 
   fn parse_conjunct(&mut self) -> CompileResult<'src, Expression<'src>> {
-    if self.accepted_keyword(Keyword::If)? {
+    if self.next_is_keyword(Keyword::If) {
       self.parse_conditional()
     } else if self.accepted(Slash)? {
       let lhs = None;
@@ -806,6 +814,8 @@ impl<'run, 'src> Parser<'run, 'src> {
 
   /// Parse a conditional, e.g. `if a == b { "foo" } else { "bar" }`
   fn parse_conditional(&mut self) -> CompileResult<'src, Expression<'src>> {
+    let if_token = self.presume_keyword(Keyword::If)?;
+
     let condition = self.parse_condition()?;
 
     self.expect(BraceL)?;
@@ -814,21 +824,24 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     self.expect(BraceR)?;
 
-    self.expect_keyword(Keyword::Else)?;
-
-    let otherwise = if self.accepted_keyword(Keyword::If)? {
-      self.parse_conditional()?
+    let otherwise = if self.accepted_keyword(Keyword::Else)? {
+      if self.next_is_keyword(Keyword::If) {
+        Some(self.parse_conditional()?.into())
+      } else {
+        self.expect(BraceL)?;
+        let otherwise = self.parse_expression()?;
+        self.expect(BraceR)?;
+        Some(otherwise.into())
+      }
     } else {
-      self.expect(BraceL)?;
-      let otherwise = self.parse_expression()?;
-      self.expect(BraceR)?;
-      otherwise
+      self.list_feature(ListFeature::IfWithoutElse, if_token);
+      None
     };
 
     Ok(Expression::Conditional {
       condition: condition.into(),
       then: then.into(),
-      otherwise: otherwise.into(),
+      otherwise,
     })
   }
 
@@ -843,7 +856,7 @@ impl<'run, 'src> Parser<'run, 'src> {
   }
 
   fn parse_format_string(&mut self) -> CompileResult<'src, Expression<'src>> {
-    self.expect_keyword(Keyword::F)?;
+    self.presume_keyword(Keyword::F)?;
 
     let start = self.parse_string_literal_in_state(StringState::FormatStart)?;
 
@@ -953,6 +966,12 @@ impl<'run, 'src> Parser<'run, 'src> {
             "bool" => {
               self.restricted_function(RestrictedFunction::List(ListFeature::BoolFunction), name);
             }
+            "join_list" => {
+              self.restricted_function(
+                RestrictedFunction::List(ListFeature::JoinListFunction),
+                name,
+              );
+            }
             "show" => {
               self.restricted_function(RestrictedFunction::List(ListFeature::ShowFunction), name);
             }
@@ -999,7 +1018,10 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     self.expect(BracketR)?;
 
-    Ok(Expression::List { elements })
+    Ok(Expression::List {
+      elements,
+      open: bracket,
+    })
   }
 
   /// Parse a string literal, e.g. `"FOO"`
@@ -1233,6 +1255,7 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     for attribute in &attributes {
       let Attribute::Arg {
+        flag,
         help,
         long,
         long_key,
@@ -1240,11 +1263,14 @@ impl<'run, 'src> Parser<'run, 'src> {
         pattern,
         short,
         value,
-        ..
       } = attribute
       else {
         continue;
       };
+
+      if let Some(token) = flag {
+        self.list_feature(ListFeature::Flag, *token);
+      }
 
       if let Some(option) = long {
         if !longs.insert(&option.cooked) {
@@ -1271,6 +1297,7 @@ impl<'run, 'src> Parser<'run, 'src> {
       arg_attributes.insert(
         arg.cooked.clone(),
         ArgAttribute {
+          flag: flag.is_some(),
           help: help.as_ref().map(|literal| literal.cooked.clone()),
           name: arg.token,
           pattern: pattern.clone(),
@@ -1415,6 +1442,7 @@ impl<'run, 'src> Parser<'run, 'src> {
       None
     };
 
+    let mut flag = false;
     let mut help = None;
     let mut long = None;
     let mut pattern = None;
@@ -1422,6 +1450,7 @@ impl<'run, 'src> Parser<'run, 'src> {
     let mut value = None;
 
     if let Some(arg) = arg_attributes.remove(name.lexeme()) {
+      flag = arg.flag;
       help = arg.help;
       long = arg.long;
       pattern = arg.pattern;
@@ -1433,9 +1462,19 @@ impl<'run, 'src> Parser<'run, 'src> {
       return Err(name.error(CompileErrorKind::VariadicParameterWithOption));
     }
 
+    if flag {
+      if default.is_some() {
+        return Err(name.error(CompileErrorKind::FlagWithDefault {
+          parameter: name.lexeme().into(),
+        }));
+      }
+      value = Some("true".into());
+    }
+
     Ok(Parameter {
       default,
       export,
+      flag,
       help,
       kind,
       long,
@@ -1751,6 +1790,20 @@ mod tests {
       line:   $line:expr,
       column: $column:expr,
       width:  $width:expr,
+      found:  $found:expr,
+    ) => {
+      #[test]
+      fn $name() {
+        unexpected_token($input, $offset, $line, $column, $width, $found);
+      }
+    };
+    (
+      name:   $name:ident,
+      input:  $input:expr,
+      offset: $offset:expr,
+      line:   $line:expr,
+      column: $column:expr,
+      width:  $width:expr,
       kind:   $kind:expr,
     ) => {
       #[test]
@@ -1787,6 +1840,40 @@ mod tests {
           kind: kind.into(),
         };
         assert_eq!(have, want);
+      }
+    }
+  }
+
+  #[track_caller]
+  fn unexpected_token(
+    src: &str,
+    offset: usize,
+    line: usize,
+    column: usize,
+    length: usize,
+    found: TokenKind,
+  ) {
+    let tokens = Lexer::test_lex(src).expect("Lexing failed in parse test...");
+
+    match Parser::parse_tokens(&mut Numerator::new(), &tokens) {
+      Ok(_) => panic!("Parsing unexpectedly succeeded"),
+      Err(have) => {
+        assert_eq!(
+          have.token,
+          Token {
+            kind: have.token.kind,
+            src,
+            offset,
+            line,
+            column,
+            length,
+            path: "justfile".as_ref(),
+          },
+        );
+        match *have.kind {
+          UnexpectedToken { found: actual, .. } => assert_eq!(actual, found),
+          kind => panic!("expected `UnexpectedToken`, but got: {kind:?}"),
+        }
       }
     }
   }
@@ -2837,8 +2924,14 @@ mod tests {
 
   test! {
     name: conditional,
-    text: "a := if b == c { d } else { e }",
-    tree: (justfile (assignment a (if (== b c) d e))),
+    text: "a := if b { c } else { d }",
+    tree: (justfile (assignment a (if b c d))),
+  }
+
+  test! {
+    name: conditional_without_otherwise,
+    text: "a := if b { c }",
+    tree: (justfile (assignment a (if b c))),
   }
 
   test! {
@@ -2849,8 +2942,8 @@ mod tests {
 
   test! {
     name: conditional_concatenations,
-    text: "a := if b0 + b1 == c0 + c1 { d0 + d1 } else { e0 + e1 }",
-    tree: (justfile (assignment a (if (== (+ b0 b1) (+ c0 c1)) (+ d0 d1) (+ e0 e1)))),
+    text: "a := if b0 + b1 { c0 + c1 } else { d0 + d1 }",
+    tree: (justfile (assignment a (if (+ b0 b1) (+ c0 c1) (+ d0 d1)))),
   }
 
   test! {
@@ -2867,14 +2960,14 @@ mod tests {
 
   test! {
     name: conditional_nested_then,
-    text: "a := if b == c { if b == c { d } else { e } } else { e }",
-    tree: (justfile (assignment a (if (== b c) (if (== b c) d e) e))),
+    text: "a := if b { if c { d } else { e } } else { f }",
+    tree: (justfile (assignment a (if b (if c d e) f))),
   }
 
   test! {
     name: conditional_nested_otherwise,
-    text: "a := if b == c { d } else { if b == c { d } else { e } }",
-    tree: (justfile (assignment a (if (== b c) d (if (== b c) d e)))),
+    text: "a := if b { c } else { if d { e } else { f } }",
+    tree: (justfile (assignment a (if b c (if d e f)))),
   }
 
   test! {
@@ -2951,14 +3044,14 @@ mod tests {
 
   test! {
     name: assert,
-    text: "a := assert(foo == \"bar\", \"error\")",
-    tree: (justfile (assignment a (assert (== foo "bar") "error"))),
+    text: "a := assert(b, \"error\")",
+    tree: (justfile (assignment a (assert b "error"))),
   }
 
   test! {
     name: assert_conditional_condition,
-    text: "foo := assert(if a != b { c } else { d } == \"abc\", \"error\")",
-    tree: (justfile (assignment foo (assert (== (if (!= a b) c d) "abc") "error"))),
+    text: "foo := assert(if a { b } else { c }, \"error\")",
+    tree: (justfile (assignment foo (assert (if a b c) "error"))),
   }
 
   test! {
@@ -2986,7 +3079,7 @@ mod tests {
     line:   0,
     column: 17,
     width:  3,
-    kind:   UnexpectedToken { expected: vec![ColonColon, Comment, Eof, Eol], found: Identifier },
+    found:  Identifier,
   }
 
   error! {
@@ -2996,7 +3089,7 @@ mod tests {
     line:   0,
     column: 13,
     width:  1,
-    kind:   UnexpectedToken {expected: vec![Identifier], found:Eol},
+    found:  Eol,
   }
 
   error! {
@@ -3006,7 +3099,7 @@ mod tests {
     line:   0,
     column: 18,
     width:  1,
-    kind:   UnexpectedToken {expected: vec![Identifier], found:Eol},
+    found:  Eol,
   }
 
   error! {
@@ -3016,10 +3109,7 @@ mod tests {
     line:   0,
     column: 16,
     width:  1,
-    kind:   UnexpectedToken {
-      found:    Colon,
-      expected: vec![ColonColon, Comment, Eof, Eol],
-    },
+    found:  Colon,
   }
 
   error! {
@@ -3029,10 +3119,7 @@ mod tests {
     line:   0,
     column: 5,
     width:  1,
-    kind:   UnexpectedToken{
-      expected: vec![Asterisk, Colon, Dollar, Equals, Identifier, Plus],
-      found:    Eol
-    },
+    found:  Eol,
   }
 
   error! {
@@ -3062,17 +3149,7 @@ mod tests {
     line:   0,
     column: 10,
     width:  0,
-    kind:   UnexpectedToken {
-      expected: vec![
-        Backtick,
-        Bang,
-        BracketL,
-        Identifier,
-        ParenL,
-        StringToken,
-      ],
-      found: Eof,
-    },
+    found:  Eof,
   }
 
   error! {
@@ -3082,20 +3159,7 @@ mod tests {
     line:    0,
     column:  9,
     width:   1,
-    kind:    UnexpectedToken{
-      expected: vec![
-        AmpersandAmpersand,
-        Asterisk,
-        ColonColon,
-        Comment,
-        Eof,
-        Eol,
-        Identifier,
-        Indent,
-        ParenL,
-      ],
-      found: Equals
-    },
+    found:  Equals,
   }
 
   error! {
@@ -3105,10 +3169,7 @@ mod tests {
     line:   0,
     column: 0,
     width:  1,
-    kind: UnexpectedToken {
-      expected: vec![At, BracketL, Comment, Eof, Eol, Identifier],
-      found: BraceL,
-    },
+    found:  BraceL,
   }
 
   error! {
@@ -3118,19 +3179,7 @@ mod tests {
     line:   0,
     column: 9,
     width:  0,
-    kind: UnexpectedToken{
-      expected: vec![
-        Backtick,
-        Bang,
-        BracketL,
-        Identifier,
-        ParenL,
-        ParenR,
-        Slash,
-        StringToken,
-      ],
-      found: Eof,
-    },
+    found:  Eof,
   }
 
   error! {
@@ -3140,7 +3189,7 @@ mod tests {
     line:   0,
     column: 6,
     width:  1,
-    kind:   UnexpectedToken{expected: vec![Dollar, Identifier], found: Colon},
+    found:  Colon,
   }
 
   error! {
@@ -3160,10 +3209,7 @@ mod tests {
     line:   0,
     column: 8,
     width:  0,
-    kind:   UnexpectedToken {
-      expected: vec![Asterisk, Colon, Dollar, Equals, Identifier, Plus],
-      found:    Eof
-    },
+    found:  Eof,
   }
 
   error! {
@@ -3203,18 +3249,7 @@ mod tests {
     line:   0,
     column: 14,
     width:  1,
-    kind:   UnexpectedToken {
-      expected: vec![
-        Backtick,
-        Bang,
-        BracketL,
-        Identifier,
-        ParenL,
-        Slash,
-        StringToken,
-      ],
-      found: BracketR,
-    },
+    found:  BracketR,
   }
 
   error! {
@@ -3224,19 +3259,7 @@ mod tests {
     line:   0,
     column: 21,
     width:  0,
-    kind:   UnexpectedToken {
-      expected: vec![
-        Backtick,
-        Bang,
-        BracketL,
-        BracketR,
-        Identifier,
-        ParenL,
-        Slash,
-        StringToken,
-      ],
-      found: Eof,
-    },
+    found:  Eof,
   }
 
   error! {
@@ -3246,21 +3269,7 @@ mod tests {
     line:   0,
     column: 20,
     width:  0,
-    kind:   UnexpectedToken {
-      expected: vec![
-        AmpersandAmpersand,
-        BangEquals,
-        BangTilde,
-        BarBar,
-        BracketR,
-        Comma,
-        EqualsEquals,
-        EqualsTilde,
-        Plus,
-        Slash,
-      ],
-      found: Eof,
-    },
+    found:  Eof,
   }
 
   error! {
@@ -3270,10 +3279,7 @@ mod tests {
     line:   0,
     column: 1,
     width:  1,
-    kind:   UnexpectedToken {
-      expected: vec![Identifier],
-      found: BracketR,
-    },
+    found:  BracketR,
   }
 
   error! {
@@ -3288,18 +3294,6 @@ mod tests {
 
   error! {
     name:   set_unknown,
-    input:  "set shall := []",
-    offset: 4,
-    line:   0,
-    column: 4,
-    width:  5,
-    kind:   UnknownSetting {
-      setting: "shall",
-    },
-  }
-
-  error! {
-    name:   set_shell_non_string,
     input:  "set shall := []",
     offset: 4,
     line:   0,

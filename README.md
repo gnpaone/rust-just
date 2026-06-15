@@ -1240,12 +1240,26 @@ The `lists` setting<sup>master</sup> allows values that are lists of strings.
 It is currently unstable and will change in backwards incompatible ways. This
 section documents changes in behavior when `set lists` is enabled.
 
+Lists may be used in many contexts, and their behavior in many of those
+contexts has not yet been decided. Using a list in those contexts, such as with
+`+` or `/`, or with many functions, is an error. The `join_list()` function can
+be used to convert a list into a space-separated string for use in these
+contexts. Feedback on how lists should behave in these contexts, and on lists
+in general, is most welcome. Feel free to open an issue or leave a comment in
+the [`set lists` tracking issue](https://github.com/casey/just/issues/3377).
+
 Variadic recipe parameters are lists of strings instead of single
 space-separated strings.
 
 List literals are written `[a, b, c]`. List literals flatten their arguments,
 lists may only contain strings and not other lists. For example,
 `[["a", "b"], [], "c"]` evaluates to `["a", "b", "c"]`.
+
+Lists in recipe and `f`-string interpolations are joined with spaces into a
+single string.
+
+In `[env(variable, value)]` if `value` is `[]`, `variable` is not set.
+Otherwise it is set to `value` joined with spaces.
 
 The following functions apply to each list element individually:
 
@@ -1271,6 +1285,9 @@ containing its literal representation. Brackets are used for empty and
 multi-element lists, e.g., `"[]"` and `"["foo", "bar"]"`, but not
 single-element lists, e.g., `"foo"`.
 
+A `join_list(value)` function is available for joining the elements of `value`
+into a space-separated string.
+
 The functions `is_dependency()`, `path_exists()`, and `semver_matches()` return
 the canonical booleans.
 
@@ -1293,11 +1310,29 @@ element.
 The condition of an `if` or `assert()` may be any expression, which is
 evaluated for truthiness.
 
+`assert(condition)` evalutes to `condition`.
+
+The `else` of an `if` may be omitted, in which case the `if` evaluates to `[]`
+when its condition is false.
+
 The comparison operators `==`, `!=`, `=~`, and `!~` may be used anywhere, not
 just in `if` and `assert()`, and evaluate to `"true"` or `[]`.
 
+`value =~ regex` is true if any element in `value` matches `regex`.
+`[] =~ regex` is false.
+
+`value !~ regex` is true if no element in `value` matches `regex`.
+`[] !~ regex` is true.
+
 Values may be negated with `!`. `!expression` evaluates to `"true"` if
 `expression` is `[]`, otherwise it evaluates to `[]`.
+
+The `[arg]` `flag` attribute, makes the parameter a flag which does not take a
+value on the command line. For example, with `[arg(foo, long, flag)]`, `foo`
+will be `"true"` when `--foo` is passed, and `[]` otherwise.
+
+Message values in `assert(condition, message)` and `[confirm(message)]` are
+space-joined for display.
 
 ##### Examples
 
@@ -1346,12 +1381,14 @@ $1=one
 $2=two
 ```
 
-A mapped dependency is invoked once per element of its starred argument:
+A mapped dependency is invoked once per element of its starred argument, with
+`[parallel]` to run them in parallel:
 
 ```just
 set unstable
 set lists
 
+[parallel]
 build target *platform: *(compile target *platform)
 
 @compile target platform:
@@ -1362,6 +1399,16 @@ build target *platform: *(compile target *platform)
 $ just build x86 foo bar
 compiling foo for x86…
 compiling bar for x86…
+```
+
+The canonical false value `[]` is recommended as a default for options:
+
+```just
+set unstable
+set lists
+
+#[arg(bar, long)]
+foo bar=[]:
 ```
 
 #### Positional Arguments
