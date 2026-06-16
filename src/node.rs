@@ -121,10 +121,14 @@ impl<'src> Node<'src> for Expression<'src> {
     match self {
       Self::And { lhs, rhs } => Tree::atom("&&").push(lhs.tree()).push(rhs.tree()),
       Self::Assert {
-        condition, error, ..
-      } => Tree::atom(Keyword::Assert.lexeme())
-        .push(condition.tree())
-        .push(error.tree()),
+        condition, message, ..
+      } => {
+        let mut tree = Tree::atom(Keyword::Assert.lexeme()).push(condition.tree());
+        if let Some(message) = message {
+          tree = tree.push(message.tree());
+        }
+        tree
+      }
       Self::Backtick { contents, .. } => Tree::atom("backtick").push(Tree::string(contents)),
       Self::Call { name, arguments } => {
         let mut tree = Tree::atom("call");
@@ -137,7 +141,7 @@ impl<'src> Node<'src> for Expression<'src> {
       Self::Comparison { lhs, operator, rhs } => Tree::atom(operator.to_string())
         .push(lhs.tree())
         .push(rhs.tree()),
-      Self::Concatenation { lhs, rhs } => Tree::atom("+").push(lhs.tree()).push(rhs.tree()),
+      Self::Concatenation { lhs, rhs, .. } => Tree::atom("+").push(lhs.tree()).push(rhs.tree()),
       Self::Conditional {
         condition,
         then,
@@ -161,10 +165,11 @@ impl<'src> Node<'src> for Expression<'src> {
         tree
       }
       Self::Group { contents } => Tree::List(vec![contents.tree()]),
-      Self::Join { lhs: None, rhs } => Tree::atom("/").push(rhs.tree()),
+      Self::Join { lhs: None, rhs, .. } => Tree::atom("/").push(rhs.tree()),
       Self::Join {
         lhs: Some(lhs),
         rhs,
+        ..
       } => Tree::atom("/").push(lhs.tree()).push(rhs.tree()),
       Self::List { elements, .. } => {
         let mut tree = Tree::atom("list");

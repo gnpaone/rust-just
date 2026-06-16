@@ -28,12 +28,11 @@ pub(crate) struct Parser<'run, 'src> {
   file_depth: u32,
   import_offsets: Vec<usize>,
   items: Vec<Item<'src>>,
-  list_feature: Option<(ListFeature, Token<'src>)>,
+  list_features: Vec<(ListFeature, Token<'src>)>,
   module_namepath: Option<&'run Namepath<'src>>,
   next_token: usize,
   numerator: &'run mut Numerator,
   recursion_depth: usize,
-  restricted_functions: Vec<(RestrictedFunction, Token<'src>)>,
   tokens: &'run [Token<'src>],
   unstable_features: BTreeSet<UnstableFeature>,
   working_directory: &'run Path,
@@ -54,12 +53,11 @@ impl<'run, 'src> Parser<'run, 'src> {
       file_depth,
       import_offsets: import_offsets.to_vec(),
       items: Vec::new(),
-      list_feature: None,
+      list_features: Vec::new(),
       module_namepath,
       next_token: 0,
       numerator,
       recursion_depth: 0,
-      restricted_functions: Vec::new(),
       tokens,
       unstable_features: BTreeSet::new(),
       working_directory,
@@ -97,16 +95,8 @@ impl<'run, 'src> Parser<'run, 'src> {
     Ok(self.next()?.error(kind))
   }
 
-  fn list_feature(&mut self, list_feature: ListFeature, token: Token<'src>) {
-    if self.list_feature.is_none() {
-      self.list_feature = Some((list_feature, token));
-    }
-  }
-
-  fn restricted_function(&mut self, restricted_function: RestrictedFunction, name: Name<'src>) {
-    self
-      .restricted_functions
-      .push((restricted_function, name.token));
+  fn list_feature(&mut self, feature: ListFeature, token: Token<'src>) {
+    self.list_features.push((feature, token));
   }
 
   /// Construct an unexpected token error with the token returned by
@@ -501,9 +491,8 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     Ok(Ast {
       items: self.items,
-      list_feature: self.list_feature,
+      list_features: self.list_features,
       module_path: self.module_namepath.map(Into::into).unwrap_or_default(),
-      restricted_functions: self.restricted_functions,
       unstable_features: self.unstable_features,
       warnings: Vec::new(),
       working_directory: self.working_directory.into(),
@@ -791,21 +780,21 @@ impl<'run, 'src> Parser<'run, 'src> {
   fn parse_conjunct(&mut self) -> CompileResult<'src, Expression<'src>> {
     if self.next_is_keyword(Keyword::If) {
       self.parse_conditional()
-    } else if self.accepted(Slash)? {
+    } else if let Some(operator) = self.accept(Slash)? {
       let lhs = None;
       let rhs = self.parse_conjunct()?.into();
-      Ok(Expression::Join { lhs, rhs })
+      Ok(Expression::Join { lhs, operator, rhs })
     } else {
       let value = self.parse_value()?;
 
-      if self.accepted(Slash)? {
+      if let Some(operator) = self.accept(Slash)? {
         let lhs = Some(Box::new(value));
         let rhs = self.parse_conjunct()?.into();
-        Ok(Expression::Join { lhs, rhs })
-      } else if self.accepted(Plus)? {
+        Ok(Expression::Join { lhs, operator, rhs })
+      } else if let Some(operator) = self.accept(Plus)? {
         let lhs = value.into();
         let rhs = self.parse_conjunct()?.into();
-        Ok(Expression::Concatenation { lhs, rhs })
+        Ok(Expression::Concatenation { lhs, operator, rhs })
       } else {
         Ok(value)
       }
@@ -949,12 +938,15 @@ impl<'run, 'src> Parser<'run, 'src> {
       if let Some(name) = self.accept_keyword(Keyword::Assert)? {
         self.expect(ParenL)?;
         let condition = Box::new(self.parse_condition()?);
-        self.expect(Comma)?;
-        let error = Box::new(self.parse_expression()?);
+        let message = if self.accepted(Comma)? {
+          Some(Box::new(self.parse_expression()?))
+        } else {
+          None
+        };
         self.expect(ParenR)?;
         Ok(Expression::Assert {
           condition,
-          error,
+          message,
           name,
         })
       } else {
@@ -964,22 +956,19 @@ impl<'run, 'src> Parser<'run, 'src> {
           let arguments = self.parse_sequence()?;
           match name.lexeme() {
             "bool" => {
-              self.restricted_function(RestrictedFunction::List(ListFeature::BoolFunction), name);
+              self.list_feature(ListFeature::BoolFunction, *name);
             }
             "join_list" => {
-              self.restricted_function(
-                RestrictedFunction::List(ListFeature::JoinListFunction),
-                name,
-              );
+              self.list_feature(ListFeature::JoinListFunction, *name);
             }
             "show" => {
-              self.restricted_function(RestrictedFunction::List(ListFeature::ShowFunction), name);
+              self.list_feature(ListFeature::ShowFunction, *name);
+            }
+            "split" => {
+              self.list_feature(ListFeature::SplitFunction, *name);
             }
             "which" => {
-              self.restricted_function(
-                RestrictedFunction::Unstable(UnstableFeature::WhichFunction),
-                name,
-              );
+              self.list_feature(ListFeature::WhichFunction, *name);
             }
             _ => {}
           }
@@ -1730,7 +1719,7 @@ impl<'run, 'src> Parser<'run, 'src> {
 
         discriminants.insert(attribute.discriminant(), name.line);
 
-        attributes.push(attribute);
+        attributes.push((attribute, name));
 
         if !self.accepted(Comma)? {
           break;

@@ -118,6 +118,11 @@ fn join_list_joins_lists_with_spaces() {
 }
 
 #[test]
+fn join_list_joins_with_separator() {
+  assert_list_eq("join_list(['bar', 'baz'], ', ')", r#""bar, baz""#);
+}
+
+#[test]
 fn join_list_requires_lists_setting() {
   Test::new()
     .justfile(r#"x := join_list("foo")"#)
@@ -129,6 +134,100 @@ fn join_list_requires_lists_setting() {
           │
         1 │ x := join_list("foo")
           │      ^^^^^^^^^
+      "#,
+    )
+    .failure();
+}
+
+#[test]
+fn join_list_separator_must_not_be_a_list() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        foo:
+          @echo {{ join_list(['bar', 'baz'], [',', ';']) }}
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      r#"
+        error: list value [",", ";"] passed to `join_list()`
+        the behavior of lists with many built-in functions is undecided
+        see https://github.com/casey/just#lists
+         ——▶ justfile:4:12
+          │
+        4 │   @echo {{ join_list(['bar', 'baz'], [',', ';']) }}
+          │            ^^^^^^^^^
+      "#,
+    )
+    .failure();
+}
+
+#[test]
+fn split_splits_string_on_separator() {
+  assert_list_eq("split('foo,bar,baz', ',')", r#"["foo", "bar", "baz"]"#);
+}
+
+#[test]
+fn split_of_string_not_containing_separator_is_single_element() {
+  assert_list_eq("split('foo', ',')", r#""foo""#);
+}
+
+#[test]
+fn split_keeps_empty_elements_with_explicit_separator() {
+  assert_list_eq("split('foo,,bar,', ',')", r#"["foo", "", "bar", ""]"#);
+}
+
+#[test]
+fn split_without_separator_splits_on_whitespace() {
+  assert_list_eq("split('  foo \t bar  baz ')", r#"["foo", "bar", "baz"]"#);
+}
+
+#[test]
+fn split_without_separator_of_whitespace_is_empty() {
+  assert_list_eq("split('  \t ')", "[]");
+}
+
+#[test]
+fn split_requires_lists_setting() {
+  Test::new()
+    .justfile(r#"x := split("foo", ",")"#)
+    .args(["--evaluate", "x"])
+    .stderr(
+      r#"
+        error: the `split()` function requires `set lists`
+         ——▶ justfile:1:6
+          │
+        1 │ x := split("foo", ",")
+          │      ^^^^^
+      "#,
+    )
+    .failure();
+}
+
+#[test]
+fn split_argument_must_not_be_a_list() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        foo:
+          @echo {{ split(['bar', 'baz'], ',') }}
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      r#"
+        error: list value ["bar", "baz"] passed to `split()`
+        the behavior of lists with many built-in functions is undecided
+        see https://github.com/casey/just#lists
+         ——▶ justfile:4:12
+          │
+        4 │   @echo {{ split(['bar', 'baz'], ',') }}
+          │            ^^^^^
       "#,
     )
     .failure();
@@ -300,7 +399,7 @@ fn empty_list_for_plus_variadic_is_an_error() {
     )
     .env("JUST_UNSTABLE", "1")
     .arg("foo")
-    .stderr("error: recipe `bar` parameter `rest` requires at least one element but received an empty list\n")
+    .stderr("error: recipe `bar` parameter `rest` requires at least one element but received empty list\n")
     .failure();
 }
 
@@ -319,7 +418,7 @@ fn empty_list_for_required_parameter_is_an_error() {
     )
     .env("JUST_UNSTABLE", "1")
     .arg("foo")
-    .stderr("error: recipe `bar` parameter `first` requires at least one element but received an empty list\n")
+    .stderr("error: recipe `bar` parameter `first` requires at least one element but received empty list\n")
     .failure();
 }
 
@@ -434,29 +533,92 @@ fn evaluate_prints_lists() {
 }
 
 #[test]
-fn string_in_list_context_error() {
-  Test::new()
-    .justfile(
-      "
-        set lists
+fn concatenation_broadcasts_string_over_list() {
+  assert_list_eq("'foo' + ['bar', 'baz']", r#"["foobar", "foobaz"]"#);
+  assert_list_eq("['bar', 'baz'] + 'foo'", r#"["barfoo", "bazfoo"]"#);
+}
 
-        foo *args:
-          @echo {{ args + 'foo'}}
+#[test]
+fn concatenation_combines_equal_length_lists_pairwise() {
+  assert_list_eq("['a', 'b'] + ['c', 'd']", r#"["ac", "bd"]"#);
+}
+
+#[test]
+fn concatenation_of_strings_is_a_string() {
+  assert_list_eq("'foo' + 'bar'", r#""foobar""#);
+}
+
+#[test]
+fn concatenation_of_empty_lists_is_empty() {
+  assert_list_eq("[] + []", "[]");
+}
+
+#[test]
+fn join_broadcasts_string_over_list() {
+  assert_list_eq("'foo' / ['bar', 'baz']", r#"["foo/bar", "foo/baz"]"#);
+  assert_list_eq("['bar', 'baz'] / 'foo'", r#"["bar/foo", "baz/foo"]"#);
+}
+
+#[test]
+fn join_combines_equal_length_lists_pairwise() {
+  assert_list_eq("['a', 'b'] / ['c', 'd']", r#"["a/c", "b/d"]"#);
+}
+
+#[test]
+fn unary_join_broadcasts_over_list() {
+  assert_list_eq("/ ['bar', 'baz']", r#"["/bar", "/baz"]"#);
+}
+
+#[test]
+fn concatenation_with_empty_list_is_an_error() {
+  Test::new()
+    .justfile("set lists\n\nx := 'foo' + []")
+    .env("JUST_UNSTABLE", "1")
+    .args(["--evaluate", "x"])
+    .stderr(
+      r"
+        error: operator `+` cannot be applied to empty lists
+         ——▶ justfile:3:12
+          │
+        3 │ x := 'foo' + []
+          │            ^
       ",
     )
+    .failure();
+}
+
+#[test]
+fn concatenation_of_different_length_lists_is_an_error() {
+  Test::new()
+    .justfile("set lists\n\nx := ['a', 'b'] + ['c', 'd', 'e']")
     .env("JUST_UNSTABLE", "1")
-    .args(["foo", "bar", "baz"])
+    .args(["--evaluate", "x"])
     .stderr(
       r#"
-        error: list value ["bar", "baz"] used as `+` operand
-        the ideal behavior of lists in many contexts is undecided
-        see https://github.com/casey/just#lists
-        note that the source location of this error may be inaccurate
-         ——▶ justfile:4:12
+        error: operator `+` cannot be applied to lists of different lengths: ["a", "b"] + ["c", "d", "e"]
+         ——▶ justfile:3:17
           │
-        4 │   @echo {{ args + 'foo'}}
-          │            ^^^^
+        3 │ x := ['a', 'b'] + ['c', 'd', 'e']
+          │                 ^
       "#,
+    )
+    .failure();
+}
+
+#[test]
+fn unary_join_with_empty_list_is_an_error() {
+  Test::new()
+    .justfile("set lists\n\nx := / []")
+    .env("JUST_UNSTABLE", "1")
+    .args(["--evaluate", "x"])
+    .stderr(
+      r"
+        error: operator `/` cannot be applied to empty lists
+         ——▶ justfile:3:6
+          │
+        3 │ x := / []
+          │      ^
+      ",
     )
     .failure();
 }
@@ -530,11 +692,11 @@ fn env_attribute_empty_list_leaves_variable_unset() {
 
         [env('FOO', [])]
         foo:
-          @echo "[${FOO-unset}]"
+          @echo "${FOO-unset}"
       "#,
     )
     .env("JUST_UNSTABLE", "1")
-    .stdout("[unset]\n")
+    .stdout("unset\n")
     .success();
 }
 
@@ -553,4 +715,352 @@ fn env_attribute_empty_string_sets_variable() {
     .env("JUST_UNSTABLE", "1")
     .stdout("[]\n")
     .success();
+}
+
+#[test]
+fn empty_list_export_leaves_variable_unset() {
+  Test::new()
+    .justfile(
+      r#"
+        set lists
+
+        export FOO := []
+
+        foo:
+          @echo "${FOO-unset}"
+      "#,
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stdout("unset\n")
+    .success();
+}
+
+#[test]
+fn non_empty_list_export_sets_variable() {
+  Test::new()
+    .justfile(
+      r#"
+        set lists
+
+        export FOO := ['bar', 'baz']
+
+        foo:
+          @echo "$FOO"
+      "#,
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stdout("bar baz\n")
+    .success();
+}
+
+#[test]
+fn empty_list_exported_parameter_leaves_variable_unset() {
+  Test::new()
+    .justfile(
+      r#"
+        set lists
+
+        foo $bar=[]:
+          @echo "${bar-unset}"
+      "#,
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stdout("unset\n")
+    .success();
+}
+
+#[test]
+fn empty_list_set_export_leaves_variable_unset() {
+  Test::new()
+    .justfile(
+      r#"
+        set lists
+        set export
+
+        FOO := []
+
+        foo:
+          @echo "${FOO-unset}"
+      "#,
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stdout("unset\n")
+    .success();
+}
+
+#[test]
+fn list_in_env_attribute_name_points_at_attribute_name() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        [env(['FOO', 'BAR'], 'baz')]
+        foo:
+          @echo hi
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      r#"
+        error: list value ["FOO", "BAR"] used as `env` attribute name
+         ——▶ justfile:3:2
+          │
+        3 │ [env(['FOO', 'BAR'], 'baz')]
+          │  ^^^
+      "#,
+    )
+    .failure();
+}
+
+#[test]
+fn env_returns_first_present_variable() {
+  Test::new()
+    .justfile("set lists\n\nx := env(['ZADDY', 'BAR'])")
+    .env("JUST_UNSTABLE", "1")
+    .env("BAR", "bar")
+    .args(["--evaluate", "x"])
+    .stdout("bar")
+    .unindent_stdout(false)
+    .success();
+}
+
+#[test]
+fn env_stops_at_first_present_variable_including_empty() {
+  Test::new()
+    .justfile("set lists\n\nx := show(env(['ZADDY', 'BAR']))")
+    .env("JUST_UNSTABLE", "1")
+    .env("ZADDY", "")
+    .env("BAR", "bar")
+    .args(["--evaluate", "x"])
+    .stdout(r#""""#)
+    .unindent_stdout(false)
+    .success();
+}
+
+#[test]
+fn env_returns_default_when_no_variable_present() {
+  assert_list_eq("env(['ZADDY', 'XYZ'], 'baz')", r#""baz""#);
+}
+
+#[test]
+fn env_returns_list_default() {
+  assert_list_eq("env(['ZADDY'], ['a', 'b'])", r#"["a", "b"]"#);
+}
+
+#[test]
+fn env_with_empty_key_list_uses_default() {
+  assert_list_eq("env([], 'baz')", r#""baz""#);
+}
+
+#[test]
+fn env_with_empty_key_list_and_no_default_is_an_error() {
+  Test::new()
+    .arg("a")
+    .justfile(
+      "
+        set lists
+
+        a:
+          echo {{env([])}}
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      "
+        error: call to function `env` failed: empty environment variable list with no default
+         ——▶ justfile:4:10
+          │
+        4 │   echo {{env([])}}
+          │          ^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn env_missing_keys_error_names_all_keys() {
+  Test::new()
+    .arg("a")
+    .justfile(
+      "
+        set lists
+
+        a:
+          echo {{env(['ZADDY', 'XYZ'])}}
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      "
+        error: call to function `env` failed: environment variables `ZADDY` and `XYZ` not present
+         ——▶ justfile:4:10
+          │
+        4 │   echo {{env(['ZADDY', 'XYZ'])}}
+          │          ^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn env_single_missing_key_keeps_singular_message() {
+  Test::new()
+    .arg("a")
+    .justfile(
+      "
+        set lists
+
+        a:
+          echo {{env('ZADDY')}}
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      "
+        error: call to function `env` failed: environment variable `ZADDY` not present
+         ——▶ justfile:4:10
+          │
+        4 │   echo {{env('ZADDY')}}
+          │          ^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn env_var_accepts_list_of_keys() {
+  Test::new()
+    .justfile("set lists\n\nx := env_var(['ZADDY', 'BAR'])")
+    .env("JUST_UNSTABLE", "1")
+    .env("BAR", "bar")
+    .args(["--evaluate", "x"])
+    .stdout("bar")
+    .unindent_stdout(false)
+    .success();
+}
+
+#[test]
+fn env_var_or_default_accepts_list_of_keys() {
+  assert_list_eq("env_var_or_default(['ZADDY', 'XYZ'], [])", "[]");
+}
+
+#[test]
+fn list_in_working_directory_attribute_points_at_attribute_name() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        [working-directory(['foo', 'bar'])]
+        baz:
+          @echo hi
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      r#"
+        error: list value ["foo", "bar"] used as a `[working-directory]` attribute
+         ——▶ justfile:3:2
+          │
+        3 │ [working-directory(['foo', 'bar'])]
+          │  ^^^^^^^^^^^^^^^^^
+      "#,
+    )
+    .failure();
+}
+
+#[test]
+fn interpreter_settings_flatten_lists() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+        set shell := ['echo', ['foo', 'bar']]
+
+        baz:
+          hello
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stdout("foo bar hello\n")
+    .stderr("hello\n")
+    .shell(false)
+    .success();
+}
+
+#[test]
+fn empty_interpreter_setting_is_an_error() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+        set shell := [[]]
+
+        foo:
+          @echo bar
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      "
+        error: `shell` setting requires at least one element but evaluated to empty list
+         ——▶ justfile:2:5
+          │
+        2 │ set shell := [[]]
+          │     ^^^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn list_in_function_argument_points_at_function_name() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        foo:
+          @echo {{ uppercase(['bar', 'baz']) }}
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      r#"
+        error: list value ["bar", "baz"] passed to `uppercase()`
+        the behavior of lists with many built-in functions is undecided
+        see https://github.com/casey/just#lists
+         ——▶ justfile:4:12
+          │
+        4 │   @echo {{ uppercase(['bar', 'baz']) }}
+          │            ^^^^^^^^^
+      "#,
+    )
+    .failure();
+}
+
+#[test]
+fn list_in_setting_value_points_at_setting_name() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+        set tempdir := ['foo', 'bar']
+
+        foo:
+          @echo bar
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      r#"
+        error: list value ["foo", "bar"] assigned to `tempdir` setting
+         ——▶ justfile:2:5
+          │
+        2 │ set tempdir := ['foo', 'bar']
+          │     ^^^^^^^
+      "#,
+    )
+    .failure();
 }

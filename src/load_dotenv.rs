@@ -5,38 +5,62 @@ pub(crate) fn load_dotenv(
   settings: &Settings,
   working_directory: &Path,
 ) -> RunResult<'static, BTreeMap<String, String>> {
-  let dotenv_filename = config
-    .dotenv_filename
-    .as_ref()
-    .or(settings.dotenv_filename.as_ref());
+  if !settings.lists && (config.dotenv_filename.len() > 1 || config.dotenv_path.len() > 1) {
+    return Err(Error::DotenvArgumentsRequireLists);
+  }
 
-  let dotenv_path = config
-    .dotenv_path
-    .as_ref()
-    .or(settings.dotenv_path.as_ref());
+  let filenames = if config.dotenv_filename.is_empty() {
+    settings.dotenv_filename.clone()
+  } else {
+    config.dotenv_filename.clone().into()
+  };
+
+  let paths = if config.dotenv_path.is_empty() {
+    settings.dotenv_path.clone()
+  } else {
+    config.dotenv_path.clone().into()
+  };
 
   if !settings.dotenv_load
     && !settings.dotenv_override
     && !settings.dotenv_required
-    && dotenv_filename.is_none()
-    && dotenv_path.is_none()
+    && filenames.is_empty()
+    && paths.is_empty()
   {
     return Ok(BTreeMap::new());
   }
 
-  if let Some(path) = dotenv_path {
+  let mut dotenv = BTreeMap::new();
+  let mut found = false;
+
+  for path in paths.elements() {
     let path = working_directory.join(path);
     if let Some(map) = load_from_file(&path, settings)? {
-      return Ok(map);
+      dotenv.extend(map);
+      found = true;
     }
   }
 
-  let filename = dotenv_filename.map_or(".env", |s| s.as_str());
+  if found {
+    return Ok(dotenv);
+  }
+
+  let filenames = if filenames.is_empty() {
+    ".env".into()
+  } else {
+    filenames
+  };
 
   for directory in working_directory.ancestors() {
-    let path = directory.join(filename);
-    if let Some(map) = load_from_file(&path, settings)? {
-      return Ok(map);
+    for filename in filenames.elements() {
+      if let Some(map) = load_from_file(&directory.join(filename), settings)? {
+        dotenv.extend(map);
+        found = true;
+      }
+    }
+
+    if found {
+      return Ok(dotenv);
     }
   }
 

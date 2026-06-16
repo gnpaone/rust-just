@@ -60,6 +60,7 @@ pub(crate) use {
     line::Line,
     list::List,
     list_feature::ListFeature,
+    list_operator::ListOperator,
     load_dotenv::load_dotenv,
     loader::Loader,
     modulepath::Modulepath,
@@ -86,7 +87,6 @@ pub(crate) use {
     references::References,
     request::Request,
     resolution::Resolution,
-    restricted_function::RestrictedFunction,
     scope::Scope,
     search::Search,
     search_config::SearchConfig,
@@ -140,7 +140,7 @@ pub(crate) use {
     borrow::{Borrow, Cow},
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    env,
+    env::{self, VarError},
     ffi::{OsStr, OsString},
     fmt::{self, Debug, Display, Formatter},
     fs::{self, File},
@@ -257,6 +257,7 @@ mod lexer;
 mod line;
 mod list;
 mod list_feature;
+mod list_operator;
 mod load_dotenv;
 mod loader;
 mod modulepath;
@@ -282,7 +283,6 @@ mod recipe_signature;
 mod reference;
 mod references;
 mod resolution;
-mod restricted_function;
 mod run;
 mod scope;
 mod search;
