@@ -83,6 +83,7 @@ pub(crate) enum Error<'src> {
     dotenv_error: dotenvy::Error,
     path: PathBuf,
   },
+  DotenvArgumentsRequireLists,
   DotenvRequired,
   DumpJson {
     source: serde_json::Error,
@@ -98,6 +99,9 @@ pub(crate) enum Error<'src> {
   EditorStatus {
     editor: OsString,
     status: ExitStatus,
+  },
+  EmptyInterpreter {
+    setting: Name<'src>,
   },
   EmptyListArgument {
     parameter: &'src str,
@@ -150,8 +154,13 @@ pub(crate) enum Error<'src> {
   },
   ListInStringContext {
     context: StringContext<'src>,
-    token: Box<Token<'src>>,
     value: Value,
+  },
+  ListOperation {
+    lhs: Value,
+    operator: ListOperator,
+    rhs: Value,
+    token: Box<Token<'src>>,
   },
   Load {
     path: PathBuf,
@@ -321,7 +330,9 @@ impl<'src> Error<'src> {
       Self::Compile { compile_error } => Some(compile_error.context()),
       Self::Const { const_error } => Some(const_error.context()),
       Self::FunctionCall { function, .. } => Some(function.token),
-      Self::ListInStringContext { token, .. } => Some(**token),
+      Self::EmptyInterpreter { setting } => Some(**setting),
+      Self::ListInStringContext { context, .. } => Some(context.token()),
+      Self::ListOperation { token, .. } => Some(**token),
       Self::MissingImportFile { path } => Some(*path),
       _ => None,
     }
@@ -591,6 +602,12 @@ impl ColorDisplay for Error<'_> {
           path.display(),
         )?;
       }
+      DotenvArgumentsRequireLists => {
+        write!(
+          f,
+          "multiple `--dotenv-filename` or `--dotenv-path` arguments require `set lists`"
+        )?;
+      }
       DotenvRequired => {
         write!(f, "dotenv file not found")?;
       }
@@ -611,10 +628,16 @@ impl ColorDisplay for Error<'_> {
         let editor = editor.to_string_lossy();
         write!(f, "editor `{editor}` failed: {status}")?;
       }
+      EmptyInterpreter { setting } => {
+        write!(
+          f,
+          "`{setting}` setting requires at least one element but evaluated to empty list"
+        )?;
+      }
       EmptyListArgument { parameter, recipe } => {
         write!(
           f,
-          "recipe `{recipe}` parameter `{parameter}` requires at least one element but received an empty list"
+          "recipe `{recipe}` parameter `{parameter}` requires at least one element but received empty list"
         )?;
       }
       EvalUnknownSubmodule { component, .. } => {
@@ -678,14 +701,29 @@ impl ColorDisplay for Error<'_> {
         write!(f, "interrupted by {signal}")?;
       }
       ListInStringContext { context, value, .. } => {
-        write!(
-          f,
-          "list value {} {context}\n\
-          the ideal behavior of lists in many contexts is undecided\n\
-          see https://github.com/casey/just#lists\n\
-          note that the source location of this error may be inaccurate",
-          value.color_display(color),
-        )?;
+        write!(f, "list value {} {context}", value.color_display(color))?;
+
+        if matches!(context, StringContext::Function { .. }) {
+          write!(
+            f,
+            "\nthe behavior of lists with many built-in functions is undecided\n\
+            see https://github.com/casey/just#lists",
+          )?;
+        }
+      }
+      ListOperation {
+        operator, lhs, rhs, ..
+      } => {
+        if lhs.is_empty() || rhs.is_empty() {
+          write!(f, "operator `{operator}` cannot be applied to empty lists")?;
+        } else {
+          write!(
+            f,
+            "operator `{operator}` cannot be applied to lists of different lengths: {} {operator} {}",
+            lhs.color_display(color),
+            rhs.color_display(color),
+          )?;
+        }
       }
       ShellIo {
         recipe,

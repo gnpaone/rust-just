@@ -88,18 +88,13 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           settings.default_script = value;
         }
         Setting::DotenvFilename(value) => {
-          settings.dotenv_filename =
-            Some(self.evaluate_string(&value, StringContext::DotenvFilename)?);
+          settings.dotenv_filename = self.evaluate_value(&value)?;
         }
         Setting::DotenvLoad(value) => {
           settings.dotenv_load = value;
         }
         Setting::DotenvPath(value) => {
-          settings.dotenv_path = Some(
-            self
-              .evaluate_string(&value, StringContext::DotenvPath)?
-              .into(),
-          );
+          settings.dotenv_path = self.evaluate_value(&value)?;
         }
         Setting::DotenvOverride(value) => {
           settings.dotenv_override = value;
@@ -138,11 +133,10 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           settings.quiet = value;
         }
         Setting::ScriptInterpreter(value) => {
-          settings.script_interpreter =
-            Some(self.evaluate_interpreter(&value, StringContext::ScriptInterpreter)?);
+          settings.script_interpreter = Some(self.evaluate_interpreter(&value, set.name)?);
         }
         Setting::Shell(value) => {
-          settings.shell = Some(self.evaluate_interpreter(&value, StringContext::Shell)?);
+          settings.shell = Some(self.evaluate_interpreter(&value, set.name)?);
         }
         Setting::Unstable(value) => {
           settings.unstable = value;
@@ -151,16 +145,15 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           settings.windows_powershell = value;
         }
         Setting::WindowsShell(value) => {
-          settings.windows_shell =
-            Some(self.evaluate_interpreter(&value, StringContext::WindowsShell)?);
+          settings.windows_shell = Some(self.evaluate_interpreter(&value, set.name)?);
         }
         Setting::Tempdir(value) => {
-          settings.tempdir = Some(self.evaluate_string(&value, StringContext::Tempdir)?);
+          settings.tempdir = Some(self.evaluate_string(&value, StringContext::Setting(set.name))?);
         }
         Setting::WorkingDirectory(value) => {
           settings.working_directory = Some(
             self
-              .evaluate_string(&value, StringContext::WorkingDirectorySetting)?
+              .evaluate_string(&value, StringContext::Setting(set.name))?
               .into(),
           );
         }
@@ -173,15 +166,22 @@ impl<'src, 'run> Evaluator<'src, 'run> {
   pub(crate) fn evaluate_interpreter(
     &mut self,
     interpreter: &Interpreter<Expression<'src>>,
-    context: StringContext<'src>,
+    setting: Name<'src>,
   ) -> RunResult<'src, Interpreter<String>> {
+    let mut elements = self.evaluate_value(&interpreter.command)?.into_elements();
+    for argument in &interpreter.arguments {
+      elements.extend(self.evaluate_value(argument)?.into_elements());
+    }
+
+    let mut elements = elements.into_iter();
+
+    let Some(command) = elements.next() else {
+      return Err(Error::EmptyInterpreter { setting });
+    };
+
     Ok(Interpreter {
-      command: self.evaluate_string(&interpreter.command, context)?,
-      arguments: interpreter
-        .arguments
-        .iter()
-        .map(|argument| self.evaluate_string(argument, context))
-        .collect::<RunResult<Vec<String>>>()?,
+      command,
+      arguments: elements.collect(),
     })
   }
 
@@ -329,17 +329,12 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     }
     match function {
       Function::Nullary(f) => f(context!()).map(Value::from),
-      Function::NullaryValue(f) => f(context!()),
       Function::Unary(f) => {
-        let a = self.evaluate_string(&arguments[0], StringContext::Function { name })?;
+        let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
         f(context!(), &a).map(Value::from)
       }
-      Function::UnaryValue(f) => {
-        let a = self.evaluate_string(&arguments[0], StringContext::Function { name })?;
-        f(context!(), &a)
-      }
-      Function::UnaryList(f) => {
-        let a = self.evaluate_value(&arguments[0])?;
+      Function::UnaryToValue(f) => {
+        let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
         f(context!(), &a)
       }
       Function::UnaryMap(f) => {
@@ -349,52 +344,80 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           .map(|element| f(context!(), element))
           .collect()
       }
-      Function::UnaryOpt(f) => {
-        let a = self.evaluate_string(&arguments[0], StringContext::Function { name })?;
-        let b = if arguments.len() > 1 {
-          Some(self.evaluate_string(&arguments[1], StringContext::Function { name })?)
-        } else {
-          None
-        };
-        f(context!(), &a, b.as_deref()).map(Value::from)
-      }
       Function::UnaryPlus(f) => {
-        let a = self.evaluate_string(&arguments[0], StringContext::Function { name })?;
+        let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
         let mut rest = Vec::new();
         for arg in &arguments[1..] {
-          rest.push(self.evaluate_string(arg, StringContext::Function { name })?);
+          rest.push(self.evaluate_string(arg, StringContext::Function(name))?);
         }
         f(context!(), &a, &rest).map(Value::from)
       }
-      Function::BinaryList(f) => {
-        let a = self.evaluate_string(&arguments[0], StringContext::Function { name })?;
+      Function::BinaryStrValue(f) => {
+        let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
         let b = self.evaluate_value(&arguments[1])?;
         f(context!(), &a, &b)
       }
       Function::Binary(f) => {
-        let a = self.evaluate_string(&arguments[0], StringContext::Function { name })?;
-        let b = self.evaluate_string(&arguments[1], StringContext::Function { name })?;
+        let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
+        let b = self.evaluate_string(&arguments[1], StringContext::Function(name))?;
         f(context!(), &a, &b).map(Value::from)
       }
-      Function::BinaryValue(f) => {
-        let a = self.evaluate_string(&arguments[0], StringContext::Function { name })?;
-        let b = self.evaluate_string(&arguments[1], StringContext::Function { name })?;
+      Function::BinaryToValue(f) => {
+        let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
+        let b = self.evaluate_string(&arguments[1], StringContext::Function(name))?;
         f(context!(), &a, &b)
       }
       Function::BinaryPlus(f) => {
-        let a = self.evaluate_string(&arguments[0], StringContext::Function { name })?;
-        let b = self.evaluate_string(&arguments[1], StringContext::Function { name })?;
+        let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
+        let b = self.evaluate_string(&arguments[1], StringContext::Function(name))?;
         let mut rest = Vec::new();
         for arg in &arguments[2..] {
-          rest.push(self.evaluate_string(arg, StringContext::Function { name })?);
+          rest.push(self.evaluate_string(arg, StringContext::Function(name))?);
         }
         f(context!(), &a, &b, &rest).map(Value::from)
       }
       Function::Ternary(f) => {
-        let a = self.evaluate_string(&arguments[0], StringContext::Function { name })?;
-        let b = self.evaluate_string(&arguments[1], StringContext::Function { name })?;
-        let c = self.evaluate_string(&arguments[2], StringContext::Function { name })?;
+        let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
+        let b = self.evaluate_string(&arguments[1], StringContext::Function(name))?;
+        let c = self.evaluate_string(&arguments[2], StringContext::Function(name))?;
         f(context!(), &a, &b, &c).map(Value::from)
+      }
+      Function::ValueNullary(f) => f(context!()),
+      Function::ValueUnary(f) => {
+        let a = self.evaluate_value(&arguments[0])?;
+        f(context!(), &a)
+      }
+      Function::ValueBinary(f) => {
+        let a = self.evaluate_value(&arguments[0])?;
+        let b = self.evaluate_value(&arguments[1])?;
+        f(context!(), &a, &b)
+      }
+      Function::ValueBinaryOpt(f) => {
+        let a = self.evaluate_value(&arguments[0])?;
+        let b = if arguments.len() > 1 {
+          Some(self.evaluate_value(&arguments[1])?)
+        } else {
+          None
+        };
+        f(context!(), &a, b.as_ref())
+      }
+      Function::BinaryOptToValue(f) => {
+        let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
+        let b = if arguments.len() > 1 {
+          Some(self.evaluate_string(&arguments[1], StringContext::Function(name))?)
+        } else {
+          None
+        };
+        f(context!(), &a, b.as_deref())
+      }
+      Function::BinaryOptValueStrToValue(f) => {
+        let a = self.evaluate_value(&arguments[0])?;
+        let b = if arguments.len() > 1 {
+          Some(self.evaluate_string(&arguments[1], StringContext::Function(name))?)
+        } else {
+          None
+        };
+        f(context!(), &a, b.as_deref())
       }
     }
     .map_err(|message| Error::FunctionCall {
@@ -411,11 +434,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     let value = self.evaluate_value(expression)?;
 
     if value.elements().len() != 1 {
-      return Err(Error::ListInStringContext {
-        context,
-        token: Box::new(expression.token()),
-        value,
-      });
+      return Err(Error::ListInStringContext { context, value });
     }
 
     Ok(value.join())
@@ -433,7 +452,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
       }
       Expression::Assert {
         condition,
-        error,
+        message,
         name,
       } => {
         let value = self.evaluate_value(condition)?;
@@ -441,7 +460,11 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           Ok(if self.lists { value } else { Value::from("") })
         } else {
           Err(Error::Assert {
-            message: self.evaluate_value(error)?.join(),
+            message: if let Some(message) = message {
+              self.evaluate_value(message)?.join()
+            } else {
+              format!("`{condition}`")
+            },
             name: *name,
           })
         }
@@ -471,10 +494,10 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         }
       }
       Expression::Comparison { .. } => Ok(self.evaluate_boolean(expression)?.into()),
-      Expression::Concatenation { lhs, rhs } => {
-        let lhs = self.evaluate_string(lhs, StringContext::Concatenation)?;
-        let rhs = self.evaluate_string(rhs, StringContext::Concatenation)?;
-        Ok((lhs + &rhs).into())
+      Expression::Concatenation { lhs, operator, rhs } => {
+        let lhs = self.evaluate_value(lhs)?;
+        let rhs = self.evaluate_value(rhs)?;
+        lhs.apply(&rhs, ListOperator::Concatenate, *operator)
       }
       Expression::Conditional {
         condition,
@@ -504,16 +527,22 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         }
       }
       Expression::Group { contents } => self.evaluate_value(contents),
-      Expression::Join { lhs: None, rhs } => {
-        Ok(("/".to_string() + &self.evaluate_string(rhs, StringContext::Join)?).into())
+      Expression::Join {
+        lhs: None,
+        operator,
+        rhs,
+      } => {
+        let rhs = self.evaluate_value(rhs)?;
+        Value::from("").apply(&rhs, ListOperator::Join, *operator)
       }
       Expression::Join {
         lhs: Some(lhs),
+        operator,
         rhs,
       } => {
-        let lhs = self.evaluate_string(lhs, StringContext::Join)?;
-        let rhs = self.evaluate_string(rhs, StringContext::Join)?;
-        Ok((lhs + "/" + &rhs).into())
+        let lhs = self.evaluate_value(lhs)?;
+        let rhs = self.evaluate_value(rhs)?;
+        lhs.apply(&rhs, ListOperator::Join, *operator)
       }
       Expression::List { elements, .. } => {
         let mut values = Vec::new();
@@ -559,24 +588,27 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     let condition = match operator {
       ConditionalOperator::Equality => self.evaluate_value(lhs)? == self.evaluate_value(rhs)?,
       ConditionalOperator::Inequality => self.evaluate_value(lhs)? != self.evaluate_value(rhs)?,
-      ConditionalOperator::RegexMatch => {
+      ConditionalOperator::RegexMatch | ConditionalOperator::RegexMismatch => {
         let lhs = self.evaluate_value(lhs)?;
-        let rhs = self.evaluate_string(rhs, StringContext::Regex)?;
+        let rhs = self.evaluate_value(rhs)?;
 
-        let regex = Regex::new(&rhs).map_err(|source| Error::RegexCompile { source })?;
-
-        lhs.elements().iter().any(|element| regex.is_match(element))
-      }
-      ConditionalOperator::RegexMismatch => {
-        let lhs = self.evaluate_value(lhs)?;
-        let rhs = self.evaluate_string(rhs, StringContext::Regex)?;
-
-        let regex = Regex::new(&rhs).map_err(|source| Error::RegexCompile { source })?;
-
-        lhs
+        let regexes = rhs
           .elements()
           .iter()
-          .all(|element| !regex.is_match(element))
+          .map(|regex| Regex::new(regex))
+          .collect::<Result<Vec<Regex>, regex::Error>>()
+          .map_err(|source| Error::RegexCompile { source })?;
+
+        let matched = lhs
+          .elements()
+          .iter()
+          .any(|element| regexes.iter().any(|regex| regex.is_match(element)));
+
+        match operator {
+          ConditionalOperator::RegexMatch => matched,
+          ConditionalOperator::RegexMismatch => !matched,
+          _ => unreachable!(),
+        }
       }
     };
     Ok(condition)
@@ -669,7 +701,8 @@ impl<'src, 'run> Evaluator<'src, 'run> {
 
     for attribute in &recipe.attributes {
       if let Attribute::Env(key, value) = attribute {
-        let key = evaluator.evaluate_string(key, StringContext::EnvKey)?;
+        let context = StringContext::EnvKey(recipe.attributes.name(attribute));
+        let key = evaluator.evaluate_string(key, context)?;
         let value = evaluator.evaluate_value(value)?;
         if !value.is_empty() {
           evaluator.env.insert(key, value.join());
