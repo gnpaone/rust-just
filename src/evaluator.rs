@@ -499,6 +499,17 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         let rhs = self.evaluate_value(rhs)?;
         lhs.apply(&rhs, ListOperator::Concatenate, *operator)
       }
+      Expression::ListConcatenation { lhs, rhs, .. } => {
+        let lhs = self.evaluate_value(lhs)?;
+        let rhs = self.evaluate_value(rhs)?;
+        Ok(
+          lhs
+            .into_elements()
+            .into_iter()
+            .chain(rhs.into_elements())
+            .collect(),
+        )
+      }
       Expression::Conditional {
         condition,
         then,
@@ -728,6 +739,8 @@ impl<'src, 'run> Evaluator<'src, 'run> {
             recipe: recipe.name(),
           });
         }
+      } else if let Some(ref value) = parameter.value {
+        evaluator.evaluate_value(value)?
       } else {
         argument.clone()
       };
