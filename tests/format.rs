@@ -394,6 +394,28 @@ fn assignment_concat_values() {
 }
 
 #[test]
+fn assignment_list_concat_values() {
+  Test::new()
+    .arg("--dump")
+    .justfile(
+      "
+        set lists
+
+        foo := ['bar'] ++ ['baz']
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stdout(
+      "
+        set lists
+
+        foo := ['bar'] ++ ['baz']
+      ",
+    )
+    .success();
+}
+
+#[test]
 fn assignment_if_oneline() {
   Test::new()
     .arg("--dump")
@@ -1707,6 +1729,29 @@ fn arg_attribute_flag() {
         set lists
 
         [arg('bar', long='bar', flag)]
+        @foo bar:
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn arg_attribute_value() {
+  Test::new()
+    .justfile(
+      "
+        BAZ := 'baz'
+
+        [arg('bar', long='bar', value=BAZ + env('FOO', 'foo'))]
+        @foo bar:
+      ",
+    )
+    .arg("--dump")
+    .stdout(
+      "
+        BAZ := 'baz'
+
+        [arg('bar', long='bar', value=BAZ + env('FOO', 'foo'))]
         @foo bar:
       ",
     )
