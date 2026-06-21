@@ -30,7 +30,7 @@ jobs:
         runner: [ubuntu-latest]
         target: [x86_64, x86, aarch64, armv7, s390x, ppc64le, riscv64] # loongarch64 excluded for now as pypi has no support
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.find-latest-tag.outputs.tag }}
       - name: Copy README.md and LICENSE
@@ -62,7 +62,7 @@ jobs:
         runner: [ubuntu-latest]
         target: [x86_64, x86, aarch64, armv7, riscv64] # loongarch64 excluded for now as pypi has no support
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.find-latest-tag.outputs.tag }}
       - name: Copy README.md and LICENSE
@@ -94,7 +94,7 @@ jobs:
         runner: [windows-2025-vs2026]
         target: [x64, x86]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.find-latest-tag.outputs.tag }}
       - name: Copy README.md and LICENSE
@@ -125,7 +125,7 @@ jobs:
         runner: [macos-14]
         target: [x86_64, aarch64]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.find-latest-tag.outputs.tag }}
       - name: Copy README.md and LICENSE
@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [find-latest-tag]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.find-latest-tag.outputs.tag }}
       - name: Copy README.md and LICENSE

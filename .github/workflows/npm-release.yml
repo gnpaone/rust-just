@@ -66,7 +66,7 @@ jobs:
             TARGET: aarch64-apple-darwin
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Download & Extract release artifact
         uses: robinraju/release-downloader@v1.13
         with:
@@ -115,7 +115,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install Node.js
         uses: actions/setup-node@v6
         with:
