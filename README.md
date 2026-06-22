@@ -1042,6 +1042,7 @@ foo:
 | `allow-duplicate-variables` | boolean | `false` | Allow variables appearing later in a `justfile` to override earlier variables with the same name. |
 | `default-list` | boolean | `false` | List recipes instead of running the default recipe. |
 | `default-script`<sup>1.52.0</sup> | boolean | `false` | Default recipes to script instead of shell. |
+| `dotenv-command`<sup>master</sup> | string | - | Run a command and load its output as an environment file. |
 | `dotenv-filename` | string | - | Load a `.env` file with a custom name, if present. |
 | `dotenv-load` | boolean | `false` | Load a `.env` file, if present. |
 | `dotenv-override` | boolean | `false` | Override existing environment variables with values from the `.env` file. |
@@ -1156,6 +1157,18 @@ must be accessed using `$VARIABLE_NAME` in recipes and backticks.
 
 If `dotenv-override` is set, variables from the environment file will override
 existing environment variables.
+
+If `dotenv-command` is set, `just` runs it with the configured `shell` and loads
+its standard output as an environment file.
+
+This is useful for sourcing secrets from a secret manager or vault:
+
+```just
+set dotenv-command := 'sops -d .enc.env'
+```
+
+The command-line option `--dotenv-command` can be used to set or override
+`dotenv-command` at runtime.
 
 For example, if your `.env` file contains:
 
@@ -1321,6 +1334,10 @@ searched for the names in `dotenv-filename`, followed by its ancestors,
 stopping in the first directory that contains any of them and loading all
 matching files in that directory. If multiple environment files are loaded,
 variables in files later in list take precedence over earlier ones.
+
+Each element of the value of `set dotenv-command` is run as a command, with
+variables from commands later in the list taking precedence over variables from
+commands earlier in the list.
 
 ##### Attributes
 
@@ -2551,6 +2568,7 @@ change their behavior.
 | `[arg(ARG, pattern="PATTERN")]`<sup>1.45.0</sup> | recipe | Require values of argument `ARG` to match regular expression `PATTERN`. |
 | `[arg(ARG, short="S")]`<sup>1.46.0</sup> | recipe | Require values of argument `ARG` to be passed as short `-S` option. |
 | `[arg(ARG, value=VALUE)]`<sup>1.46.0</sup> | recipe | Makes option `ARG` a flag which does not take a value. |
+| `[cache]`<sup>master</sup> | recipe | Skip recipe invocations when a matching entry exists in the cache. See [cached recipes](#cached-recipes) for details. Currently unstable. |
 | `[confirm(PROMPT)]`<sup>1.23.0</sup> | recipe | Require confirmation prior to executing recipe with a custom prompt. |
 | `[confirm]`<sup>1.17.0</sup> | recipe | Require confirmation prior to executing recipe. |
 | `[default]`<sup>1.43.0</sup> | recipe | Use recipe as module's default recipe. |
@@ -3750,6 +3768,41 @@ run: venv
   ./foo/bin/python3 main.py
 ```
 
+### Activating Environments
+
+Some tools require an activation step, such as Python virtual environments:
+
+```sh
+. .venv/bin/activate
+```
+
+Because these tools modify the environment of a running shell, it is not
+possible for `just` to perform this activation step for you. However, there are
+some workarounds.
+
+The best workaround for Python environment management is to switch to
+[`uv`](https://docs.astral.sh/uv/). `uv` sets up the correct environment for
+each command, so no activation step is needed.
+
+If that isn't possible, and for other tools, you can create a shared prelude
+and include it in script recipes that need it. It can span multiple lines and
+include any number of steps:
+
+```just
+prelude := '''
+  set -eux
+  . .venv/bin/activate
+'''
+
+[script]
+run:
+  {{ prelude }}
+  python script.py
+```
+
+This workaround doesn't work with shell recipes, which spawn a new shell for
+each command.
+
 ### Changing the Working Directory in a Recipe
 
 Each recipe line is executed by a new shell, so if you change the working
@@ -4025,6 +4078,76 @@ options set with environment variables are inherited by recursive invocations
 of `just`, whereas command-line options set with arguments are not.
 
 Consult `just --help` for which options can be set with environment variables.
+
+### Cached Recipes
+
+`just` will skip invocations of recipes with the `[cache]`
+attribute<sup>master</sup> if it finds an entry matching the invocation in the
+cache. The `[cache]` attribute may only be used with script recipes and is
+currently unstable and meaningfully incomplete.
+
+Unlike many other features of `just`, which are, hopefully, well thought-out
+and user-friendly, cached recipes are inherently fragile, and it is important
+to understand their limitations before relying on them. Please read this
+section thoroughly, including the friendly admonitions below.
+
+The cache is a directory named `.justcache` alongside the `justfile` and should
+not be committed to version control systems. It contains cache entry named
+`HASH.json`, where `HASH` is the BLAKE3 hash of a serialized cache key JSON
+object.
+
+The keys of the cache key object are:
+
+- The `::`-separated module path to the invoked recipe
+- The evaluated recipe body
+- The cache version, currently 0
+
+Before `just` runs a cached recipe, it creates a cache key, hashes it, and
+looks for the corresponding cache entry.
+
+If the cache entry is non-empty, it skips the invocation.
+
+If the cache entry does not exist or is empty, it runs the invocation and
+writes `{}` to the cache entry.
+
+File locks are taken on cache entries, so concurrent execution of cached
+recipes is safe. If two `just` processes run an invocation with the same cache
+key, the first will take the lock, run the recipe, write to the cache entry,
+and relinquish the lock. The second will block until the first relinquishes the
+lock, see that the entry is non-empty, and skip the invocation.
+
+#### Friendly Admonitions
+
+`just` will happily skip cached recipes, but it is your responsibility to make
+sure that this is safe, and that the contents of the cache key capture enough
+information about recipe invocations for caching to make sense in the first
+place.
+
+The cached recipes feature is incomplete, and many cache keys that should be
+automatically or optionally included are not yet implemented, including:
+
+- Exported arguments
+- Global exports
+- Positional arguments
+- The `just` binary version
+- The working directory
+- Values of the `lists` and `script-interpreter` settings
+- `.env` variables
+
+Outside of existing and contemplated cache keys there are many details about
+the context in which a recipe runs that cannot included in cache keys.
+
+These include the time, input files, output files, system binaries, operating
+system version, databases, systems over the network, the DNS, and any of the
+myriad other things which may change the execution of a computer program.
+
+Additionally, `just` will run cached recipes even when changes are unrelated or
+cosmetic, such as changes to whitespace and formatting.
+
+Attempting to skip execution based on the type of crude heuristics that `just`
+employs has a long and sordid history. However, it is an undeniably convenient
+and powerful tool, and it is provided in the hopes that you will find it
+useful.
 
 ### Private Recipes
 

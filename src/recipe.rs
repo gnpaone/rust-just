@@ -234,6 +234,7 @@ impl<'src> Recipe<'src> {
     is_dependency: bool,
     positional: &[String],
     scope: &Scope<'src, 'run>,
+    cache: &Cache,
   ) -> RunResult<'src> {
     let color = context.config.color.stderr().banner();
     let prefix = color.prefix();
@@ -241,15 +242,15 @@ impl<'src> Recipe<'src> {
 
     if context.config.verbosity.loquacious() {
       eprintln!(
-        "{prefix}===> Running recipe `{}`...{suffix}",
+        "{prefix}===> running recipe `{}`...{suffix}",
         self.recipe_path(),
       );
     }
 
-    if context.config.explain {
-      if let Some(doc) = self.doc() {
-        eprintln!("{prefix}#### {doc}{suffix}");
-      }
+    if context.config.explain
+      && let Some(doc) = self.doc()
+    {
+      eprintln!("{prefix}#### {doc}{suffix}");
     }
 
     let evaluator = Evaluator::new(
@@ -262,7 +263,7 @@ impl<'src> Recipe<'src> {
 
     let start = Instant::now();
     let result = if self.is_script(&context.module.settings) {
-      self.run_script(context, env, evaluator, positional, scope)
+      self.run_script(context, env, evaluator, positional, scope, cache)
     } else {
       self.run_shell(context, env, evaluator, positional, scope)
     };
@@ -441,10 +442,8 @@ impl<'src> Recipe<'src> {
         }
       }
 
-      if !infallible {
-        if let Some(signal) = caught {
-          return Err(Error::Interrupted { signal });
-        }
+      if !infallible && let Some(signal) = caught {
+        return Err(Error::Interrupted { signal });
       }
     }
   }
@@ -456,6 +455,7 @@ impl<'src> Recipe<'src> {
     mut evaluator: Evaluator<'src, 'run>,
     positional: &[String],
     scope: &Scope<'src, 'run>,
+    cache: &Cache,
   ) -> RunResult<'src> {
     let config = &context.config;
 
@@ -491,6 +491,28 @@ impl<'src> Recipe<'src> {
     if config.dry_run {
       return Ok(());
     }
+
+    let entry = if self.attributes.contains(AttributeDiscriminant::Cache) {
+      match cache.status(self, &evaluated_lines)? {
+        CacheStatus::Hit => {
+          if config.verbosity.loquacious() {
+            eprintln!(
+              "{}",
+              context
+                .config
+                .color
+                .stderr()
+                .banner()
+                .paint("===> cache hit, skipping invocation"),
+            );
+          }
+          return Ok(());
+        }
+        CacheStatus::Miss(entry) => Some(entry),
+      }
+    } else {
+      None
+    };
 
     let executor = if let Some(Attribute::Script(interpreter)) =
       self.attributes.get(AttributeDiscriminant::Script)
@@ -613,6 +635,10 @@ impl<'src> Recipe<'src> {
       return Err(Error::Interrupted { signal });
     }
 
+    if let Some(entry) = entry {
+      entry.save()?;
+    }
+
     Ok(())
   }
 
@@ -655,10 +681,9 @@ impl<D: Display> ColorDisplay for Recipe<'_, D> {
       .attributes
       .iter()
       .any(|attribute| matches!(attribute, Attribute::Doc(_)))
+      && let Some(doc) = &self.doc
     {
-      if let Some(doc) = &self.doc {
-        writeln!(f, "# {doc}")?;
-      }
+      writeln!(f, "# {doc}")?;
     }
 
     for attribute in &self.attributes {
