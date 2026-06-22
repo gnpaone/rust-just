@@ -72,10 +72,10 @@ impl<'run, 'src> Analyzer<'run, 'src> {
             self.functions.push(function);
           }
           Item::Import { absolute, .. } => {
-            if let Some(absolute) = absolute {
-              if imports.insert(absolute) {
-                stack.push(asts.get(absolute).unwrap());
-              }
+            if let Some(absolute) = absolute
+              && imports.insert(absolute)
+            {
+              stack.push(asts.get(absolute).unwrap());
             }
           }
           Item::Module {
@@ -265,30 +265,33 @@ impl<'run, 'src> Analyzer<'run, 'src> {
             return Err(token.error(GuardAndInfallibleSigil).into());
           }
 
-          if !continued {
-            if let Some(Fragment::Text { token }) = line.fragments.first() {
-              let text = token.lexeme();
+          if !continued && let Some(Fragment::Text { token }) = line.fragments.first() {
+            let text = token.lexeme();
 
-              if text.starts_with(' ') || text.starts_with('\t') {
-                return Err(token.error(ExtraLeadingWhitespace).into());
-              }
+            if text.starts_with(' ') || text.starts_with('\t') {
+              return Err(token.error(ExtraLeadingWhitespace).into());
             }
           }
 
           continued = line.is_continuation();
         }
 
-        if let Some(attribute) = recipe.attributes.get(AttributeDiscriminant::Extension) {
-          return Err(
-            recipe
-              .name
-              .error(InvalidAttribute {
-                item_kind: "recipe",
-                item_name: recipe.name.lexeme(),
-                attribute: Box::new(attribute.clone()),
-              })
-              .into(),
-          );
+        for attribute in [
+          AttributeDiscriminant::Cache,
+          AttributeDiscriminant::Extension,
+        ] {
+          if let Some(attribute) = recipe.attributes.get(attribute) {
+            return Err(
+              recipe
+                .name
+                .error(InvalidAttribute {
+                  item_kind: "recipe",
+                  item_name: recipe.name.lexeme(),
+                  attribute: Box::new(attribute.clone()),
+                })
+                .into(),
+            );
+          }
         }
       }
     }
@@ -402,21 +405,21 @@ impl<'run, 'src> Analyzer<'run, 'src> {
     second_type: &'static str,
     duplicates_allowed: bool,
   ) -> CompileResult<'src> {
-    if let Some((first_type, original)) = definitions.get(name.lexeme()) {
-      if !(*first_type == second_type && duplicates_allowed) {
-        let ((first_type, second_type), (original, redefinition)) = if name.line < original.line {
-          ((second_type, *first_type), (name, *original))
-        } else {
-          ((*first_type, second_type), (*original, name))
-        };
+    if let Some((first_type, original)) = definitions.get(name.lexeme())
+      && !(*first_type == second_type && duplicates_allowed)
+    {
+      let ((first_type, second_type), (original, redefinition)) = if name.line < original.line {
+        ((second_type, *first_type), (name, *original))
+      } else {
+        ((*first_type, second_type), (*original, name))
+      };
 
-        return Err(redefinition.token.error(Redefinition {
-          first_type,
-          second_type,
-          name: name.lexeme(),
-          first: original.line,
-        }));
-      }
+      return Err(redefinition.token.error(Redefinition {
+        first_type,
+        second_type,
+        name: name.lexeme(),
+        first: original.line,
+      }));
     }
 
     definitions.insert(name.lexeme(), (second_type, name));
@@ -464,20 +467,14 @@ impl<'run, 'src> Analyzer<'run, 'src> {
     }
 
     if let Some(second) = Keyword::from_lexeme(set.name.lexeme()) {
-      let first = match second {
-        Keyword::NoCd => Keyword::WorkingDirectory,
-        Keyword::WorkingDirectory => Keyword::NoCd,
-        _ => {
-          return Ok(());
+      for &first in set.value.conflicts() {
+        if let Some(conflict) = self.sets.get(first.lexeme()) {
+          return Err(set.name.error(IncompatibleSettings {
+            first,
+            first_line: conflict.name.line,
+            second,
+          }));
         }
-      };
-
-      if let Some(conflict) = self.sets.get(first.lexeme()) {
-        return Err(set.name.error(NoCdAndWorkingDirectorySetting {
-          first,
-          first_line: conflict.name.line,
-          second,
-        }));
       }
     }
 

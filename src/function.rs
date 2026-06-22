@@ -30,7 +30,7 @@ pub(crate) enum Function {
 
 impl Function {
   pub(crate) fn expected_arguments(&self) -> RangeInclusive<usize> {
-    match *self {
+    match self {
       Nullary(_) | ValueNullary(_) => 0..=0,
       Unary(_) | ValueUnary(_) | UnaryMap(_) | UnaryToValue(_) => 1..=1,
       ValueBinaryOpt(_) | BinaryOptToValue(_) | BinaryOptValueStrToValue(_) => 1..=2,
@@ -333,7 +333,7 @@ fn env(context: Context, keys: &Value, default: Option<&Value>) -> ValueResult {
       Err(VarError::NotPresent) => {}
       Err(VarError::NotUnicode(value)) => {
         return Err(format!(
-          "environment variable `{key}` not unicode: `{}`",
+          "environment variable `{key}` is not unicode: `{}`",
           value.to_string_lossy(),
         ));
       }
@@ -406,7 +406,7 @@ fn invocation_directory_native(context: Context) -> StringResult {
     .map(str::to_owned)
     .ok_or_else(|| {
       format!(
-        "Invocation directory is not valid unicode: {}",
+        "invocation directory is not valid unicode: {}",
         context
           .execution_context
           .config
@@ -473,7 +473,7 @@ fn justfile(context: Context) -> StringResult {
     .map(str::to_owned)
     .ok_or_else(|| {
       format!(
-        "Justfile path is not valid unicode: {}",
+        "justfile path is not valid unicode: {}",
         context.execution_context.search.justfile.display()
       )
     })
@@ -497,7 +497,7 @@ fn justfile_directory(context: Context) -> StringResult {
     .map(str::to_owned)
     .ok_or_else(|| {
       format!(
-        "Justfile directory is not valid unicode: {}",
+        "justfile directory is not valid unicode: {}",
         justfile_directory.display()
       )
     })
@@ -519,7 +519,7 @@ fn module_directory(context: Context) -> StringResult {
   let module_directory = context.execution_context.module.source.parent().unwrap();
   module_directory.to_str().map(str::to_owned).ok_or_else(|| {
     format!(
-      "Module directory is not valid unicode: {}",
+      "module directory is not valid unicode: {}",
       module_directory.display(),
     )
   })
@@ -529,7 +529,7 @@ fn module_file(context: Context) -> StringResult {
   let module_file = &context.execution_context.module.source;
   module_file.to_str().map(str::to_owned).ok_or_else(|| {
     format!(
-      "Module file path is not valid unicode: {}",
+      "module file path is not valid unicode: {}",
       module_file.display(),
     )
   })
@@ -670,7 +670,7 @@ fn source_directory(context: Context) -> StringResult {
     .map(str::to_owned)
     .ok_or_else(|| {
       format!(
-        "source file path not valid unicode: {}",
+        "source file path is not valid unicode: {}",
         context.name.token.path.display(),
       )
     })
@@ -688,7 +688,7 @@ fn source_file(context: Context) -> StringResult {
     .map(str::to_owned)
     .ok_or_else(|| {
       format!(
-        "source file path not valid unicode: {}",
+        "source file path is not valid unicode: {}",
         context.name.token.path.display(),
       )
     })
