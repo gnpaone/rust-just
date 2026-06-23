@@ -115,7 +115,7 @@ pub struct Arguments {
     long,
     value_name = "COMMAND"
   )]
-  pub(crate) dotenv_command: Option<String>,
+  pub(crate) dotenv_command: Vec<String>,
   #[arg(
     conflicts_with = "dotenv_path",
     help = "Search for an environment file named <DOTENV-FILENAME> instead of `.env`",
@@ -231,6 +231,8 @@ pub struct Arguments {
   pub(crate) list_submodules: bool,
   #[arg(env = "JUST_NO_ALIASES", help = "Don't show aliases in list", long)]
   pub(crate) no_aliases: bool,
+  #[arg(env = "JUST_NO_CACHE", help = "Bypass recipe cache", long)]
+  pub(crate) no_cache: bool,
   #[arg(
     alias = "no-dependencies",
     env = "JUST_NO_DEPS",
@@ -355,6 +357,15 @@ pub(crate) struct Subcommand {
     long,
   )]
   pub(crate) choose: bool,
+  #[arg(
+    conflicts_with = "arguments",
+    help = "Clear recipe cache, optionally restricted to recipes whose path begins with <PATH>",
+    help_heading = Self::HEADING,
+    long,
+    num_args = 0..,
+    value_name = "PATH",
+  )]
+  pub(crate) clean: Option<Vec<String>>,
   #[arg(
     allow_hyphen_values = true,
     help = "Run an arbitrary command with the working directory, `.env`, overrides, and exports \

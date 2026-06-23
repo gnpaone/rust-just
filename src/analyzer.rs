@@ -276,18 +276,14 @@ impl<'run, 'src> Analyzer<'run, 'src> {
           continued = line.is_continuation();
         }
 
-        for attribute in [
-          AttributeDiscriminant::Cache,
-          AttributeDiscriminant::Extension,
-        ] {
+        for attribute in [AttributeKind::Cache, AttributeKind::Extension] {
           if let Some(attribute) = recipe.attributes.get(attribute) {
             return Err(
               recipe
                 .name
-                .error(InvalidAttribute {
-                  item_kind: "recipe",
-                  item_name: recipe.name.lexeme(),
+                .error(InvalidShellRecipeAttribute {
                   attribute: Box::new(attribute.clone()),
+                  recipe: recipe.name.lexeme(),
                 })
                 .into(),
             );
@@ -344,7 +340,7 @@ impl<'run, 'src> Analyzer<'run, 'src> {
 
     let mut default = None;
     for recipe in recipes.values() {
-      if recipe.attributes.contains(AttributeDiscriminant::Default) {
+      if recipe.attributes.contains(AttributeKind::Default) {
         if default.is_some() {
           return Err(
             recipe

@@ -1168,7 +1168,9 @@ set dotenv-command := 'sops -d .enc.env'
 ```
 
 The command-line option `--dotenv-command` can be used to set or override
-`dotenv-command` at runtime.
+`dotenv-command` at runtime, and may be passed multiple times. Each value is
+run as a command, with variables from later commands taking precedence over
+variables from earlier commands.
 
 For example, if your `.env` file contains:
 
@@ -2571,6 +2573,7 @@ change their behavior.
 | `[cache]`<sup>master</sup> | recipe | Skip recipe invocations when a matching entry exists in the cache. See [cached recipes](#cached-recipes) for details. Currently unstable. |
 | `[confirm(PROMPT)]`<sup>1.23.0</sup> | recipe | Require confirmation prior to executing recipe with a custom prompt. |
 | `[confirm]`<sup>1.17.0</sup> | recipe | Require confirmation prior to executing recipe. |
+| `[continue(SIGNALS)]`<sup>master</sup> | recipe | Continue execution normally if a command is interrupted by any of `SIGNALS` and exits successfully. Defaults to `SIGINT`. |
 | `[default]`<sup>1.43.0</sup> | recipe | Use recipe as module's default recipe. |
 | `[doc(DOC)]`<sup>1.27.0</sup> | module, recipe | Set recipe or module's [documentation comment](#documentation-comments) to `DOC`. |
 | `[dragonfly]`<sup>1.47.0</sup> | recipe | Enable recipe on DragonFly BSD. |
@@ -4084,23 +4087,32 @@ Consult `just --help` for which options can be set with environment variables.
 `just` will skip invocations of recipes with the `[cache]`
 attribute<sup>master</sup> if it finds an entry matching the invocation in the
 cache. The `[cache]` attribute may only be used with script recipes and is
-currently unstable and meaningfully incomplete.
+currently unstable.
 
 Unlike many other features of `just`, which are, hopefully, well thought-out
-and user-friendly, cached recipes are inherently fragile, and it is important
-to understand their limitations before relying on them. Please read this
-section thoroughly, including the friendly admonitions below.
+and user-friendly, cached recipes are inherently fragile. It is important to
+understand their limitations before relying on them. Please read this section
+thoroughly, including the friendly admonitions below.
 
 The cache is a directory named `.justcache` alongside the `justfile` and should
-not be committed to version control systems. It contains cache entry named
+not be committed to version control systems. It contains cache entries named
 `HASH.json`, where `HASH` is the BLAKE3 hash of a serialized cache key JSON
 object.
 
 The keys of the cache key object are:
 
-- The `::`-separated module path to the invoked recipe
-- The evaluated recipe body
-- The cache version, currently 0
+- `body`: evaluated recipe body
+- `environment`: map of environment variable names to values
+- `executor`: script interpreter or shebang
+- `extra`: user-supplied value
+- `inputs`: map of file paths to content hashs
+- `positional`: positional arguments
+- `recipe`: `::`-separated module path to invoked recipe
+- `working_directory`: current working directory
+
+The value of `extra` may be supplied with `[cache(extra = EXPRESSION)]`, where
+`EXPRESSION` is an arbitrary expression evaluated with recipe arguments in
+scope. Changes to the value of `extra` will cause a cache miss.
 
 Before `just` runs a cached recipe, it creates a cache key, hashes it, and
 looks for the corresponding cache entry.
@@ -4111,10 +4123,98 @@ If the cache entry does not exist or is empty, it runs the invocation and
 writes `{}` to the cache entry.
 
 File locks are taken on cache entries, so concurrent execution of cached
-recipes is safe. If two `just` processes run an invocation with the same cache
-key, the first will take the lock, run the recipe, write to the cache entry,
-and relinquish the lock. The second will block until the first relinquishes the
-lock, see that the entry is non-empty, and skip the invocation.
+recipes by multiple `just` processes is safe. If two processes run a recipe
+invocation with the same cache key, the first will take the lock, run the
+recipe, write to the cache entry, and relinquish the lock. The second will
+block until the first relinquishes the lock, see that the entry is non-empty,
+and skip the invocation.
+
+The cache can be bypassed entirely with the `--no-cache` flag.
+
+#### Clearing the Cache
+
+The recipe cache is stored in a directory named `.justcache` alongside the
+`justfile`. Deleting it will clear the cache.
+
+The cache can also be cleared with `just --clean`, which can selectively clear
+cache entries:
+
+```sh
+# clear all cache entries
+just --clean
+
+# clear cache entries for recipe `foo`
+just --clean foo
+
+# clear cache entries for recipe `baz` in submodule `bar`
+just --clean bar baz
+
+# clear cache entries for recipes in submodule module `bar`
+just --clean bar
+
+# clear cache entries for recipes in submodule module `bar::bob`
+just --clean bar bob
+
+# '::'-separated paths may also be used
+just --clean bar::bob
+```
+
+#### Input Files
+
+Input files can be provided with `[cache(inputs = FILES)]`, where `FILES` is an
+expression that is evaluated with recipe arguments in scope and whose evaluated
+elements are paths. Paths may be absolute or relative to the recipe's working
+directory.
+
+Each input file is hashed with BLAKE3 and added to the `inputs` cache key,
+which contains a map of paths to hashes.
+
+Any changes to the contents of an input file changes the cache key, which
+causes the next invocation to miss the cache and re-run.
+
+Missing inputs and paths to directories are errors.
+
+In this example, the `build` recipe will re-run if `lib.c` or `main.c` change:
+
+```just
+set unstable
+set lists
+
+[script]
+[cache(inputs = ["lib.c", "main.c"])]
+build:
+  cc lib.c main.c -o main
+```
+
+#### Output Files
+
+Output files can be provided with `[cache(outputs = FILES)]`, where `FILES` is
+an expression that is evaluated with recipe arguments in scope and whose
+evaluated elements are paths. Paths may be absolute or relative to the recipe's
+working directory.
+
+Outputs are not part of the cache key.
+
+All output files must exist for an invocation to be skipped, and after an
+invocation runs successfully, it is an error if any output file does not exist.
+
+In this example, `build` re-runs whenever `main` is missing, and errors if it
+runs without producing `main`:
+
+```just
+set unstable
+set lists
+
+[script]
+[cache(inputs = ["lib.c", "main.c"], outputs = "main")]
+build:
+  cc lib.c main.c -o main
+
+clean:
+  rm -f main
+```
+
+This forces `build` to re-run if `main` is deleted by `clean`.
 
 #### Friendly Admonitions
 
@@ -4123,31 +4223,16 @@ sure that this is safe, and that the contents of the cache key capture enough
 information about recipe invocations for caching to make sense in the first
 place.
 
-The cached recipes feature is incomplete, and many cache keys that should be
-automatically or optionally included are not yet implemented, including:
-
-- Exported arguments
-- Global exports
-- Positional arguments
-- The `just` binary version
-- The working directory
-- Values of the `lists` and `script-interpreter` settings
-- `.env` variables
-
-Outside of existing and contemplated cache keys there are many details about
-the context in which a recipe runs that cannot included in cache keys.
+In particular, there are many details about the context in which a recipe runs
+that are not captured by cache keys.
 
 These include the time, input files, output files, system binaries, operating
 system version, databases, systems over the network, the DNS, and any of the
 myriad other things which may change the execution of a computer program.
 
-Additionally, `just` will run cached recipes even when changes are unrelated or
-cosmetic, such as changes to whitespace and formatting.
-
 Attempting to skip execution based on the type of crude heuristics that `just`
 employs has a long and sordid history. However, it is an undeniably convenient
-and powerful tool, and it is provided in the hopes that you will find it
-useful.
+and powerful tool, and it is provided in the hopes that you find it useful.
 
 ### Private Recipes
 
@@ -4853,7 +4938,7 @@ for details.
 
 [Signals](https://en.wikipedia.org/wiki/Signal_(IPC)) are messages sent to
 running programs to trigger specific behavior. For example, `SIGINT` is sent to
-all processes in the terminal foreground process group when `CTRL-C` is pressed.
+all processes in the terminal foreground process group when `ctrl-c` is pressed.
 
 `just` tries to exit when requested by a signal, but it also tries to avoid
 leaving behind running child processes, two goals which are somewhat in
@@ -4884,6 +4969,30 @@ was likely sent to `just` alone.
 
 Regardless of whether a child process terminates successfully after `just`
 receives a fatal signal, `just` halts execution.
+
+#### Continuing Execution
+
+The `[continue]`<sup>master</sup> attribute can be used to make `just` continue
+execution even if it receives a fatal signal as long as the child process it's
+running exits successfully.
+
+With no arguments, `[continue]` handles `SIGINT` (`ctrl-c`) so `SIGQUIT`
+(`ctrl-\`) can still be used to stop execution.
+
+With arguments, one or more signals to handle may be given explicitly, as
+`"SIGHUP"`, `"SIGINT"`, and `"SIGQUIT"`.
+
+In this example, if `main.py` catches `SIGINT` and exits successfully,
+`cleanup` will still run and `just` will exit successfully:
+
+```just
+[continue]
+test: && cleanup
+  python3 main.py
+
+cleanup:
+  echo cleanup
+```
 
 #### `SIGINFO`
 

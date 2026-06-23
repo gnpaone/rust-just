@@ -47,6 +47,27 @@ fn duplicate_attributes_are_disallowed() {
 }
 
 #[test]
+fn continue_attribute_rejects_invalid_signal() {
+  Test::new()
+    .justfile(
+      "
+        [continue('SIGTERM')]
+        foo:
+      ",
+    )
+    .stderr(
+      "
+        error: invalid signal `SIGTERM`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`
+         ——▶ justfile:1:11
+          │
+        1 │ [continue('SIGTERM')]
+          │           ^^^^^^^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
 fn multiple_attributes_one_line() {
   Test::new()
     .justfile(
@@ -273,7 +294,7 @@ fn extension_on_shell_error() {
     )
     .stderr(
       "
-        error: recipe `baz` has invalid attribute `extension`
+        error: shell recipe `baz` has script recipe attribute `extension`
          ——▶ justfile:2:1
           │
         2 │ baz:
@@ -578,6 +599,134 @@ fn env_attribute_overrides_export_in_script() {
 }
 
 #[test]
+fn cache_extra_dump() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        [cache(extra = 'a', inputs = ['foo'], outputs = ['bar'])]
+        [script]
+        baz:
+          echo baz
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .arg("--dump")
+    .stdout(
+      "
+        set lists
+
+        [cache(extra='a', inputs=['foo'], outputs=['bar'])]
+        [script]
+        baz:
+            echo baz
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn cache_inputs_dump() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        [cache(inputs = ['foo', 'bar'])]
+        [script]
+        baz:
+          echo baz
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .arg("--dump")
+    .stdout(
+      "
+        set lists
+
+        [cache(inputs=['foo', 'bar'])]
+        [script]
+        baz:
+            echo baz
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn cache_outputs_dump() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        [cache(inputs = ['foo'], outputs = ['bar'])]
+        [script]
+        baz:
+          echo baz
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .arg("--dump")
+    .stdout(
+      "
+        set lists
+
+        [cache(inputs=['foo'], outputs=['bar'])]
+        [script]
+        baz:
+            echo baz
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn unknown_keyword() {
+  Test::new()
+    .justfile(
+      "
+        [cache(input = 'foo')]
+        [script]
+        baz:
+          echo baz
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .stderr(
+      "
+        error: unknown key `input` for `cache` attribute
+         ——▶ justfile:1:8
+          │
+        1 │ [cache(input = 'foo')]
+          │        ^^^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn duplicate_keyword_argument() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', long='a', long='b')]
+        foo bar:
+      ",
+    )
+    .stderr(
+      "
+        error: duplicate key `long` for `arg` attribute
+         ——▶ justfile:1:23
+          │
+        1 │ [arg('bar', long='a', long='b')]
+          │                       ^^^^
+      ",
+    )
+    .failure();
+}
+#[test]
 fn env_attribute_duplicate_last_wins() {
   Test::new()
     .justfile(
@@ -590,4 +739,80 @@ fn env_attribute_duplicate_last_wins() {
     )
     .stdout("value 2\n")
     .success();
+}
+
+#[test]
+fn extra_keyword_error() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', pattern='BAR', foo='foo')]
+        foo bar:
+      ",
+    )
+    .args(["foo", "BAR"])
+    .stderr(
+      "
+        error: unknown key `foo` for `arg` attribute
+         ——▶ justfile:1:28
+          │
+        1 │ [arg('bar', pattern='BAR', foo='foo')]
+          │                            ^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn split_across_multiple_lines() {
+  Test::new()
+    .justfile(
+      "
+        [arg(
+          'bar',
+          pattern='BAR'
+        )]
+        foo bar:
+      ",
+    )
+    .args(["foo", "BAR"])
+    .success();
+}
+
+#[test]
+fn optional_trailing_comma() {
+  Test::new()
+    .justfile(
+      "
+        [arg(
+          'bar',
+          pattern='BAR',
+        )]
+        foo bar:
+      ",
+    )
+    .args(["foo", "BAR"])
+    .success();
+}
+
+#[test]
+fn positional_arguments_cannot_follow_keyword_arguments() {
+  Test::new()
+    .justfile(
+      "
+        [arg(pattern='BAR', 'bar')]
+        foo bar:
+      ",
+    )
+    .args(["foo", "BAR"])
+    .stderr(
+      "
+        error: positional attribute arguments cannot follow keyword attribute arguments
+         ——▶ justfile:1:21
+          │
+        1 │ [arg(pattern='BAR', 'bar')]
+          │                     ^^^^^
+      ",
+    )
+    .failure();
 }

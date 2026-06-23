@@ -127,6 +127,9 @@ impl Display for CompileError<'_> {
         first.ordinal(),
         self.token.line.ordinal(),
       ),
+      DuplicateAttributeKey { attribute, key } => {
+        write!(f, "duplicate key `{key}` for `{attribute}` attribute")
+      }
       DuplicateDefault { recipe } => write!(
         f,
         "recipe `{recipe}` has duplicate `[default]` attribute, which may only appear once per module",
@@ -250,6 +253,15 @@ impl Display for CompileError<'_> {
           '"' => "\"".to_owned(),
           _ => character.escape_default().collect(),
         }
+      ),
+      InvalidShellRecipeAttribute { attribute, recipe } => write!(
+        f,
+        "shell recipe `{recipe}` has script recipe attribute `{}`",
+        attribute.name(),
+      ),
+      InvalidSignal { signal } => write!(
+        f,
+        "invalid signal `{signal}`: expected `SIGHUP`, `SIGINT`, or `SIGQUIT`"
       ),
       ListFeature(feature) => write!(f, "{feature}"),
       MappedDependencyMultipleStarredArguments => {
@@ -386,8 +398,8 @@ impl Display for CompileError<'_> {
       AttributeKeyMissingValue { key } => {
         write!(f, "attribute key `{key}` requires value")
       }
-      UnknownAttributeKeyword { attribute, keyword } => {
-        write!(f, "unknown keyword `{keyword}` for `{attribute}` attribute")
+      UnknownAttributeKey { attribute, key } => {
+        write!(f, "unknown key `{key}` for `{attribute}` attribute")
       }
       UnknownAttribute { attribute } => write!(f, "unknown attribute `{attribute}`"),
       UnknownDependency { recipe, unknown } => {

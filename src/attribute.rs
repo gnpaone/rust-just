@@ -6,7 +6,7 @@ use super::*;
 )]
 #[strum(serialize_all = "kebab-case")]
 #[serde(rename_all = "kebab-case")]
-#[strum_discriminants(name(AttributeDiscriminant))]
+#[strum_discriminants(name(AttributeKind))]
 #[strum_discriminants(derive(EnumString, Ord, PartialOrd))]
 #[strum_discriminants(strum(serialize_all = "kebab-case"))]
 pub(crate) enum Attribute<'src> {
@@ -23,8 +23,13 @@ pub(crate) enum Attribute<'src> {
     short: Option<StringLiteral<'src>>,
     value: Option<Expression<'src>>,
   },
-  Cache,
+  Cache {
+    extra: Option<Expression<'src>>,
+    inputs: Option<Expression<'src>>,
+    outputs: Option<Expression<'src>>,
+  },
   Confirm(Option<Expression<'src>>),
+  Continue(BTreeSet<Signal>),
   Default,
   Doc(Option<StringLiteral<'src>>),
   Dragonfly,
@@ -51,13 +56,13 @@ pub(crate) enum Attribute<'src> {
   WorkingDirectory(Expression<'src>),
 }
 
-impl AttributeDiscriminant {
+impl AttributeKind {
   fn accepts_expressions(self) -> bool {
     matches!(self, Self::Confirm | Self::Env | Self::WorkingDirectory)
   }
 
   pub(crate) fn accepts_keyword_arguments(self) -> bool {
-    matches!(self, Self::Arg)
+    matches!(self, Self::Arg | Self::Cache)
   }
 
   fn argument_range(self) -> RangeInclusive<usize> {
@@ -82,7 +87,7 @@ impl AttributeDiscriminant {
       | Self::Unix
       | Self::Windows => 0..=0,
       Self::Confirm | Self::Doc => 0..=1,
-      Self::Script => 0..=usize::MAX,
+      Self::Continue | Self::Script => 0..=usize::MAX,
       Self::Arg | Self::Extension | Self::Group | Self::WorkingDirectory => 1..=1,
       Self::Env => 2..=2,
       Self::Metadata => 1..=usize::MAX,
@@ -116,12 +121,12 @@ impl<'src> Attribute<'src> {
 
   pub(crate) fn new(
     name: Name<'src>,
-    discriminant: AttributeDiscriminant,
+    kind: AttributeKind,
     arguments: Vec<(Token<'src>, Expression<'src>)>,
     mut keyword_arguments: BTreeMap<&'src str, (Name<'src>, Option<Expression<'src>>)>,
   ) -> CompileResult<'src, Self> {
     let found = arguments.len();
-    let range = discriminant.argument_range();
+    let range = kind.argument_range();
     if !range.contains(&found) {
       return Err(
         name.error(CompileErrorKind::AttributeArgumentCountMismatch {
@@ -133,25 +138,25 @@ impl<'src> Attribute<'src> {
       );
     }
 
-    if discriminant.accepts_expressions() {
-      if let Some((_name, (keyword, _literal))) = keyword_arguments.pop_first() {
-        return Err(keyword.error(CompileErrorKind::UnknownAttributeKeyword {
+    if kind.accepts_expressions() {
+      if let Some((_name, (key, _literal))) = keyword_arguments.pop_first() {
+        return Err(key.error(CompileErrorKind::UnknownAttributeKey {
           attribute: name.lexeme(),
-          keyword: keyword.lexeme(),
+          key: key.lexeme(),
         }));
       }
 
-      return match discriminant {
-        AttributeDiscriminant::Confirm => Ok(Self::Confirm(
+      return match kind {
+        AttributeKind::Confirm => Ok(Self::Confirm(
           arguments.into_iter().next().map(|(_, expr)| expr),
         )),
-        AttributeDiscriminant::Env => {
+        AttributeKind::Env => {
           let mut arguments = arguments.into_iter();
           let (_, key) = arguments.next().unwrap();
           let (_, value) = arguments.next().unwrap();
           Ok(Self::Env(key, value))
         }
-        AttributeDiscriminant::WorkingDirectory => Ok(Self::WorkingDirectory(
+        AttributeKind::WorkingDirectory => Ok(Self::WorkingDirectory(
           arguments.into_iter().next().map(|(_, expr)| expr).unwrap(),
         )),
         _ => unreachable!(),
@@ -170,8 +175,8 @@ impl<'src> Attribute<'src> {
       })
       .collect::<CompileResult<Vec<StringLiteral>>>()?;
 
-    let attribute = match discriminant {
-      AttributeDiscriminant::Arg => {
+    let attribute = match kind {
+      AttributeKind::Arg => {
         let arg = arguments.into_iter().next().unwrap();
 
         let (long, long_key) = keyword_arguments
@@ -260,48 +265,65 @@ impl<'src> Attribute<'src> {
           value,
         }
       }
-      AttributeDiscriminant::Android => Self::Android,
-      AttributeDiscriminant::Cache => Self::Cache,
-      AttributeDiscriminant::Confirm
-      | AttributeDiscriminant::Env
-      | AttributeDiscriminant::WorkingDirectory => unreachable!(),
-      AttributeDiscriminant::Default => Self::Default,
-      AttributeDiscriminant::Doc => Self::Doc(arguments.into_iter().next()),
-      AttributeDiscriminant::Dragonfly => Self::Dragonfly,
-      AttributeDiscriminant::ExitMessage => Self::ExitMessage,
-      AttributeDiscriminant::Extension => Self::Extension(arguments.into_iter().next().unwrap()),
-      AttributeDiscriminant::Freebsd => Self::Freebsd,
-      AttributeDiscriminant::Group => Self::Group(arguments.into_iter().next().unwrap()),
-      AttributeDiscriminant::Linux => Self::Linux,
-      AttributeDiscriminant::Macos => Self::Macos,
-      AttributeDiscriminant::Metadata => Self::Metadata(arguments),
-      AttributeDiscriminant::Netbsd => Self::Netbsd,
-      AttributeDiscriminant::NoCd => Self::NoCd,
-      AttributeDiscriminant::NoExitMessage => Self::NoExitMessage,
-      AttributeDiscriminant::NoQuiet => Self::NoQuiet,
-      AttributeDiscriminant::Openbsd => Self::Openbsd,
-      AttributeDiscriminant::Parallel => Self::Parallel,
-      AttributeDiscriminant::PositionalArguments => Self::PositionalArguments,
-      AttributeDiscriminant::Private => Self::Private,
-      AttributeDiscriminant::Script => Self::Script({
+      AttributeKind::Android => Self::Android,
+      AttributeKind::Cache => Self::Cache {
+        extra: Self::remove_required(&mut keyword_arguments, "extra")?
+          .map(|(_key, expression)| expression),
+        inputs: Self::remove_required(&mut keyword_arguments, "inputs")?
+          .map(|(_key, expression)| expression),
+        outputs: Self::remove_required(&mut keyword_arguments, "outputs")?
+          .map(|(_key, expression)| expression),
+      },
+      AttributeKind::Continue => Self::Continue(
+        arguments
+          .into_iter()
+          .map(|literal| {
+            Signal::from_name(&literal.cooked).ok_or_else(|| {
+              literal.token.error(CompileErrorKind::InvalidSignal {
+                signal: literal.cooked.clone(),
+              })
+            })
+          })
+          .collect::<CompileResult<BTreeSet<Signal>>>()?,
+      ),
+      AttributeKind::Confirm | AttributeKind::Env | AttributeKind::WorkingDirectory => {
+        unreachable!()
+      }
+      AttributeKind::Default => Self::Default,
+      AttributeKind::Doc => Self::Doc(arguments.into_iter().next()),
+      AttributeKind::Dragonfly => Self::Dragonfly,
+      AttributeKind::ExitMessage => Self::ExitMessage,
+      AttributeKind::Extension => Self::Extension(arguments.into_iter().next().unwrap()),
+      AttributeKind::Freebsd => Self::Freebsd,
+      AttributeKind::Group => Self::Group(arguments.into_iter().next().unwrap()),
+      AttributeKind::Linux => Self::Linux,
+      AttributeKind::Macos => Self::Macos,
+      AttributeKind::Metadata => Self::Metadata(arguments),
+      AttributeKind::Netbsd => Self::Netbsd,
+      AttributeKind::NoCd => Self::NoCd,
+      AttributeKind::NoExitMessage => Self::NoExitMessage,
+      AttributeKind::NoQuiet => Self::NoQuiet,
+      AttributeKind::Openbsd => Self::Openbsd,
+      AttributeKind::Parallel => Self::Parallel,
+      AttributeKind::PositionalArguments => Self::PositionalArguments,
+      AttributeKind::Private => Self::Private,
+      AttributeKind::Script => Self::Script({
         let mut arguments = arguments.into_iter();
         arguments.next().map(|command| Interpreter {
           command,
           arguments: arguments.collect(),
         })
       }),
-      AttributeDiscriminant::Shell => Self::Shell,
-      AttributeDiscriminant::Unix => Self::Unix,
-      AttributeDiscriminant::Windows => Self::Windows,
+      AttributeKind::Shell => Self::Shell,
+      AttributeKind::Unix => Self::Unix,
+      AttributeKind::Windows => Self::Windows,
     };
 
-    if let Some((_name, (keyword_name, _literal))) = keyword_arguments.pop_first() {
-      return Err(
-        keyword_name.error(CompileErrorKind::UnknownAttributeKeyword {
-          attribute: name.lexeme(),
-          keyword: keyword_name.lexeme(),
-        }),
-      );
+    if let Some((_name, (key, _literal))) = keyword_arguments.pop_first() {
+      return Err(key.error(CompileErrorKind::UnknownAttributeKey {
+        attribute: name.lexeme(),
+        key: key.lexeme(),
+      }));
     }
 
     Ok(attribute)
@@ -335,7 +357,7 @@ impl<'src> Attribute<'src> {
     Ok(string_literal)
   }
 
-  pub(crate) fn discriminant(&self) -> AttributeDiscriminant {
+  pub(crate) fn kind(&self) -> AttributeKind {
     self.into()
   }
 
@@ -397,7 +419,6 @@ impl Display for Attribute<'_> {
         write!(f, ")")?;
       }
       Self::Android
-      | Self::Cache
       | Self::Confirm(None)
       | Self::Default
       | Self::Doc(None)
@@ -418,11 +439,42 @@ impl Display for Attribute<'_> {
       | Self::Shell
       | Self::Unix
       | Self::Windows => {}
+      Self::Cache {
+        extra,
+        inputs,
+        outputs,
+      } => {
+        let mut arguments = Vec::new();
+        if let Some(extra) = extra {
+          arguments.push(format!("extra={extra}"));
+        }
+        if let Some(inputs) = inputs {
+          arguments.push(format!("inputs={inputs}"));
+        }
+        if let Some(outputs) = outputs {
+          arguments.push(format!("outputs={outputs}"));
+        }
+        if !arguments.is_empty() {
+          write!(f, "({})", arguments.join(", "))?;
+        }
+      }
       Self::Confirm(Some(argument)) | Self::WorkingDirectory(argument) => {
         write!(f, "({argument})")?;
       }
       Self::Doc(Some(argument)) | Self::Extension(argument) | Self::Group(argument) => {
         write!(f, "({argument})")?;
+      }
+      Self::Continue(signals) => {
+        if !signals.is_empty() {
+          write!(f, "(")?;
+          for (i, signal) in signals.iter().enumerate() {
+            if i > 0 {
+              write!(f, ", ")?;
+            }
+            write!(f, "\"{signal}\"")?;
+          }
+          write!(f, ")")?;
+        }
       }
       Self::Env(key, value) => write!(f, "({key}, {value})")?,
       Self::Metadata(arguments) => {

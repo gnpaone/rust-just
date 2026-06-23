@@ -27,15 +27,15 @@ pub(crate) struct Recipe<'src, D = Dependency<'src>> {
 
 impl<'src, D> Recipe<'src, D> {
   pub(crate) fn enabled(&self) -> bool {
-    let android = self.attributes.contains(AttributeDiscriminant::Android);
-    let dragonfly = self.attributes.contains(AttributeDiscriminant::Dragonfly);
-    let freebsd = self.attributes.contains(AttributeDiscriminant::Freebsd);
-    let linux = self.attributes.contains(AttributeDiscriminant::Linux);
-    let macos = self.attributes.contains(AttributeDiscriminant::Macos);
-    let netbsd = self.attributes.contains(AttributeDiscriminant::Netbsd);
-    let openbsd = self.attributes.contains(AttributeDiscriminant::Openbsd);
-    let unix = self.attributes.contains(AttributeDiscriminant::Unix);
-    let windows = self.attributes.contains(AttributeDiscriminant::Windows);
+    let android = self.attributes.contains(AttributeKind::Android);
+    let dragonfly = self.attributes.contains(AttributeKind::Dragonfly);
+    let freebsd = self.attributes.contains(AttributeKind::Freebsd);
+    let linux = self.attributes.contains(AttributeKind::Linux);
+    let macos = self.attributes.contains(AttributeKind::Macos);
+    let netbsd = self.attributes.contains(AttributeKind::Netbsd);
+    let openbsd = self.attributes.contains(AttributeKind::Openbsd);
+    let unix = self.attributes.contains(AttributeKind::Unix);
+    let windows = self.attributes.contains(AttributeKind::Windows);
 
     (!windows
       && !linux
@@ -58,7 +58,7 @@ impl<'src, D> Recipe<'src, D> {
   }
 
   pub(crate) fn is_script(&self, settings: &Settings) -> bool {
-    if self.attributes.contains(AttributeDiscriminant::Shell) {
+    if self.attributes.contains(AttributeKind::Shell) {
       false
     } else {
       self.shebang || settings.default_script
@@ -129,7 +129,7 @@ impl<'src> Recipe<'src> {
   }
 
   pub(crate) fn confirm(&self, evaluator: &mut Evaluator<'src, '_>) -> RunResult<'src, bool> {
-    if let Some(Attribute::Confirm(prompt)) = self.attributes.get(AttributeDiscriminant::Confirm) {
+    if let Some(Attribute::Confirm(prompt)) = self.attributes.get(AttributeKind::Confirm) {
       if let Some(expression) = prompt {
         eprint!("{} ", evaluator.evaluate_value(expression)?.join());
       } else {
@@ -158,30 +158,36 @@ impl<'src> Recipe<'src> {
     Ok(())
   }
 
+  fn continue_on(&self, signal: Signal) -> bool {
+    let Some(Attribute::Continue(signals)) = self.attributes.get(AttributeKind::Continue) else {
+      return false;
+    };
+
+    if signals.is_empty() {
+      signal == Signal::Interrupt
+    } else {
+      signals.contains(&signal)
+    }
+  }
+
   pub(crate) fn is_parallel(&self) -> bool {
-    self.attributes.contains(AttributeDiscriminant::Parallel)
+    self.attributes.contains(AttributeKind::Parallel)
   }
 
   pub(crate) fn is_public(&self) -> bool {
-    !self.private && !self.attributes.contains(AttributeDiscriminant::Private)
+    !self.private && !self.attributes.contains(AttributeKind::Private)
   }
 
   pub(crate) fn takes_positional_arguments(&self, settings: &Settings) -> bool {
-    settings.positional_arguments
-      || self
-        .attributes
-        .contains(AttributeDiscriminant::PositionalArguments)
+    settings.positional_arguments || self.attributes.contains(AttributeKind::PositionalArguments)
   }
 
   pub(crate) fn change_directory(&self, settings: &Settings) -> bool {
-    if self
-      .attributes
-      .contains(AttributeDiscriminant::WorkingDirectory)
-    {
+    if self.attributes.contains(AttributeKind::WorkingDirectory) {
       return true;
     }
 
-    if self.attributes.contains(AttributeDiscriminant::NoCd) {
+    if self.attributes.contains(AttributeKind::NoCd) {
       return false;
     }
 
@@ -189,14 +195,12 @@ impl<'src> Recipe<'src> {
   }
 
   fn print_exit_message(&self, settings: &Settings) -> bool {
-    if self.attributes.contains(AttributeDiscriminant::ExitMessage) {
+    if self.attributes.contains(AttributeKind::ExitMessage) {
       true
     } else if settings.no_exit_message {
       false
     } else {
-      !self
-        .attributes
-        .contains(AttributeDiscriminant::NoExitMessage)
+      !self.attributes.contains(AttributeKind::NoExitMessage)
     }
   }
 
@@ -224,7 +228,7 @@ impl<'src> Recipe<'src> {
   }
 
   fn no_quiet(&self) -> bool {
-    self.attributes.contains(AttributeDiscriminant::NoQuiet)
+    self.attributes.contains(AttributeKind::NoQuiet)
   }
 
   pub(crate) fn run<'run>(
@@ -393,7 +397,10 @@ impl<'src> Recipe<'src> {
         cmd.stdout(Stdio::null());
       }
 
-      cmd.export(settings, context.dotenv, scope, &context.module.unexports);
+      let environment =
+        Environment::new(context.dotenv, scope, settings, &context.module.unexports);
+
+      environment.export(&mut cmd);
 
       for (key, value) in env {
         cmd.env(key, value);
@@ -442,8 +449,12 @@ impl<'src> Recipe<'src> {
         }
       }
 
-      if !infallible && let Some(signal) = caught {
-        return Err(Error::Interrupted { signal });
+      if let Some(signal) = caught {
+        if self.continue_on(signal) || infallible {
+          SignalHandler::clear();
+        } else {
+          return Err(Error::Interrupted { signal });
+        }
       }
     }
   }
@@ -492,31 +503,10 @@ impl<'src> Recipe<'src> {
       return Ok(());
     }
 
-    let entry = if self.attributes.contains(AttributeDiscriminant::Cache) {
-      match cache.status(self, &evaluated_lines)? {
-        CacheStatus::Hit => {
-          if config.verbosity.loquacious() {
-            eprintln!(
-              "{}",
-              context
-                .config
-                .color
-                .stderr()
-                .banner()
-                .paint("===> cache hit, skipping invocation"),
-            );
-          }
-          return Ok(());
-        }
-        CacheStatus::Miss(entry) => Some(entry),
-      }
-    } else {
-      None
-    };
-
-    let executor = if let Some(Attribute::Script(interpreter)) =
-      self.attributes.get(AttributeDiscriminant::Script)
-    {
+    let executor = if self.attributes.contains(AttributeKind::Script) {
+      let Some(Attribute::Script(interpreter)) = self.attributes.get(AttributeKind::Script) else {
+        unreachable!();
+      };
       Executor::Command(
         interpreter
           .as_ref()
@@ -551,6 +541,97 @@ impl<'src> Recipe<'src> {
       )
     };
 
+    let working_directory = self.working_directory(context, &mut evaluator)?;
+
+    let mut environment = Environment::new(
+      context.dotenv,
+      scope,
+      &context.module.settings,
+      &context.module.unexports,
+    );
+
+    for (name, value) in env {
+      environment
+        .variables
+        .insert(name.clone(), Some(value.clone()));
+    }
+
+    let (cache_lock, outputs) = if !config.no_cache
+      && let Some(Attribute::Cache {
+        extra,
+        inputs,
+        outputs,
+      }) = self.attributes.get(AttributeKind::Cache)
+    {
+      let working_directory = match &working_directory {
+        Some(working_directory) => working_directory.to_owned(),
+        None => env::current_dir().map_err(|source| Error::CurrentDirectory { source })?,
+      };
+
+      let extra = extra
+        .as_ref()
+        .map(|extra| evaluator.evaluate_value(extra))
+        .transpose()?;
+
+      let inputs = inputs
+        .as_ref()
+        .map(|inputs| {
+          let inputs = evaluator.evaluate_value(inputs)?;
+          Cache::inputs(inputs, &working_directory)
+        })
+        .transpose()?;
+
+      let outputs = outputs
+        .as_ref()
+        .map(|outputs| -> RunResult<BTreeMap<String, PathBuf>> {
+          let outputs = evaluator.evaluate_value(outputs)?;
+          Ok(
+            outputs
+              .into_elements()
+              .into_iter()
+              .map(|output| (output.clone(), working_directory.join(output)))
+              .collect(),
+          )
+        })
+        .transpose()?
+        .unwrap_or_default();
+
+      let key = CacheKey {
+        body: &evaluated_lines,
+        environment: &environment,
+        executor: &executor,
+        extra,
+        inputs,
+        positional: self
+          .takes_positional_arguments(&context.module.settings)
+          .then_some(positional),
+        recipe: self.recipe_path(),
+        working_directory: Some(&working_directory),
+      };
+
+      let lock = match cache.status(key, &outputs)? {
+        CacheStatus::Hit => {
+          if config.verbosity.loquacious() {
+            eprintln!(
+              "{}",
+              context
+                .config
+                .color
+                .stderr()
+                .banner()
+                .paint("===> cache hit, skipping invocation"),
+            );
+          }
+          return Ok(());
+        }
+        CacheStatus::Miss(lock) => lock,
+      };
+
+      (Some(lock), outputs)
+    } else {
+      (None, BTreeMap::new())
+    };
+
     let tempdir = context.tempdir(self)?;
 
     let mut path = tempdir.path().to_path_buf();
@@ -580,27 +661,13 @@ impl<'src> Recipe<'src> {
       io_error: error,
     })?;
 
-    let mut command = executor.command(
-      config,
-      &path,
-      self.name(),
-      self.working_directory(context, &mut evaluator)?.as_deref(),
-    )?;
+    let mut command = executor.command(config, &path, self.name(), working_directory.as_deref())?;
 
     if self.takes_positional_arguments(&context.module.settings) {
       command.args(positional);
     }
 
-    command.export(
-      &context.module.settings,
-      context.dotenv,
-      scope,
-      &context.module.unexports,
-    );
-
-    for (key, value) in env {
-      command.env(key, value);
-    }
+    environment.export(&mut command);
 
     // run it!
     let (result, caught) = command.status_guard();
@@ -632,12 +699,23 @@ impl<'src> Recipe<'src> {
     }
 
     if let Some(signal) = caught {
-      return Err(Error::Interrupted { signal });
+      if self.continue_on(signal) {
+        SignalHandler::clear();
+      } else {
+        return Err(Error::Interrupted { signal });
+      }
     }
 
-    if let Some(entry) = entry {
-      entry.save()?;
+    for (output, path) in outputs {
+      if !filesystem::exists(&path)? {
+        return Err(Error::CacheOutputMissing {
+          recipe: self.name(),
+          output,
+        });
+      }
     }
+
+    cache_lock.map(CacheLock::save).transpose()?;
 
     Ok(())
   }

@@ -18,6 +18,9 @@ pub(crate) enum Subcommand {
   Choose {
     chooser: Option<PathBuf>,
   },
+  Clean {
+    path: Option<Modulepath>,
+  },
   Command {
     arguments: Vec<OsString>,
     binary: OsString,
@@ -109,6 +112,7 @@ impl Subcommand {
       Command { .. } | Evaluate { .. } => {
         justfile.run(config, &search, &[], &compilation.overrides)?;
       }
+      Clean { path } => Self::clean(config, &search, path.as_ref())?,
       Dump { format } => Self::dump(config, compilation, *format)?,
       Groups => Self::groups(config, justfile),
       List { path } => Self::list(config, justfile, path)?,
@@ -337,6 +341,80 @@ impl Subcommand {
         .collect::<Vec<String>>();
 
       justfile.run(config, search, &arguments, overrides)?;
+    }
+
+    Ok(())
+  }
+
+  fn clean(config: &Config, search: &Search, prefix: Option<&Modulepath>) -> RunResult<'static> {
+    let entry_re = Regex::new(r"^[0-9a-f]{64}\.json$").unwrap();
+
+    let path = Cache::dir(search);
+
+    let context = |source| Error::FilesystemIo {
+      source,
+      path: path.clone(),
+    };
+
+    let dir = match fs::read_dir(&path) {
+      Err(err) if err.kind() == io::ErrorKind::NotFound => {
+        if config.verbosity.loud() {
+          eprintln!("recipe cache not found");
+        }
+        return Ok(());
+      }
+      result => result.map_err(context)?,
+    };
+
+    let mut removed = 0;
+
+    for entry in dir {
+      let entry = entry.map_err(context)?;
+
+      if !entry_re.is_match(&entry.file_name().to_string_lossy()) {
+        continue;
+      }
+
+      let path = entry.path();
+
+      if let Some(prefix) = prefix {
+        let json = fs::read_to_string(&path).map_err(|source| Error::FilesystemIo {
+          source,
+          path: path.clone(),
+        })?;
+
+        if !json.is_empty() {
+          let entry =
+            serde_json::from_str::<CacheEntry>(&json).map_err(|source| Error::CacheEntryRead {
+              source,
+              path: path.clone(),
+            })?;
+
+          if !entry.recipe.starts_with(prefix) {
+            continue;
+          }
+        }
+      }
+
+      fs::remove_file(&path).map_err(|source| Error::FilesystemIo {
+        source,
+        path: path.clone(),
+      })?;
+
+      removed += 1;
+    }
+
+    if let Err(err) = fs::remove_dir(&path)
+      && err.kind() != io::ErrorKind::DirectoryNotEmpty
+    {
+      return Err(context(err));
+    }
+
+    if config.verbosity.loud() {
+      eprintln!(
+        "removed {}",
+        Count::numbered_irregular("cache entry", "cache entries", removed)
+      );
     }
 
     Ok(())
@@ -854,6 +932,7 @@ impl Subcommand {
       | Self::Summary
       | Self::Variables => false,
       Self::Choose { .. }
+      | Self::Clean { .. }
       | Self::Command { .. }
       | Self::Completions { .. }
       | Self::Evaluate { .. }
