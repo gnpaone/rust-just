@@ -11,7 +11,7 @@ pub(crate) struct Config {
   pub(crate) complete_aliases: bool,
   pub(crate) cygpath: PathBuf,
   pub(crate) default_list: bool,
-  pub(crate) dotenv_command: Option<String>,
+  pub(crate) dotenv_command: Vec<String>,
   pub(crate) dotenv_filename: Vec<String>,
   pub(crate) dotenv_path: Vec<String>,
   pub(crate) dry_run: bool,
@@ -25,6 +25,7 @@ pub(crate) struct Config {
   pub(crate) list_submodules: bool,
   pub(crate) load_dotenv: bool,
   pub(crate) no_aliases: bool,
+  pub(crate) no_cache: bool,
   pub(crate) no_dependencies: bool,
   pub(crate) one: bool,
   pub(crate) overrides: BTreeMap<(Modulepath, String), String>,
@@ -55,7 +56,7 @@ impl Config {
       complete_aliases: false,
       cygpath: Arguments::DEFAULT_CYGPATH.into(),
       default_list: false,
-      dotenv_command: None,
+      dotenv_command: Vec::new(),
       dotenv_filename: Vec::new(),
       dotenv_path: Vec::new(),
       dry_run: false,
@@ -69,6 +70,7 @@ impl Config {
       list_submodules: false,
       load_dotenv: true,
       no_aliases: false,
+      no_cache: false,
       no_dependencies: false,
       one: false,
       overrides: BTreeMap::new(),
@@ -169,6 +171,14 @@ impl Config {
       Ok(Subcommand::Choose {
         chooser: arguments.chooser.clone(),
       })
+    } else if arguments.subcommand.clean.is_some() {
+      Ok(Subcommand::Clean {
+        path: if positional.arguments.is_empty() {
+          None
+        } else {
+          Some(Self::parse_modulepath(&positional.arguments)?)
+        },
+      })
     } else if let Some(mut command) = arguments.subcommand.command.clone() {
       Ok(Subcommand::Command {
         binary: command.remove(0),
@@ -256,6 +266,7 @@ impl Config {
         .subcommand
         .list
         .as_deref()
+        .or(arguments.subcommand.clean.as_deref())
         .or(arguments.subcommand.show.as_deref())
         .or(arguments.subcommand.usage.as_deref())
         .unwrap_or(arguments.arguments.as_slice())
@@ -334,6 +345,7 @@ impl Config {
       list_submodules: arguments.list_submodules,
       load_dotenv: !arguments.no_dotenv,
       no_aliases: arguments.no_aliases,
+      no_cache: arguments.no_cache,
       no_dependencies: arguments.no_deps,
       one: arguments.one,
       overrides,
@@ -405,6 +417,7 @@ mod tests {
       $(dry_run: $dry_run:expr,)?
       $(dump_format: $dump_format:expr,)?
       $(highlight: $highlight:expr,)?
+      $(no_cache: $no_cache:expr,)?
       $(no_dependencies: $no_dependencies:expr,)?
       $(overrides: $overrides:expr,)?
       $(search_config: $search_config:expr,)?
@@ -427,6 +440,7 @@ mod tests {
           $(dry_run: $dry_run,)?
           $(dump_format: $dump_format,)?
           $(highlight: $highlight,)?
+          $(no_cache: $no_cache,)?
           $(no_dependencies: $no_dependencies,)?
           $(overrides: $overrides,)?
           $(search_config: $search_config,)?
@@ -620,6 +634,12 @@ mod tests {
     name: highlight_yes_no,
     args: ["--highlight", "--no-highlight"],
     highlight: false,
+  }
+
+  test! {
+    name: no_cache,
+    args: ["--no-cache"],
+    no_cache: true,
   }
 
   test! {

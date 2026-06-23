@@ -24,8 +24,26 @@ pub(crate) enum Error<'src> {
     token: Token<'src>,
     output_error: OutputError,
   },
+  CacheEntryRead {
+    path: PathBuf,
+    source: serde_json::Error,
+  },
+  CacheEntryWrite {
+    path: PathBuf,
+    source: serde_json::Error,
+  },
+  CacheInputDirectory {
+    path: PathBuf,
+  },
+  CacheInputMissing {
+    path: PathBuf,
+  },
   CacheKeySerialize {
     source: serde_json::Error,
+  },
+  CacheOutputMissing {
+    recipe: &'src str,
+    output: String,
   },
   ChooserInvoke {
     shell_binary: String,
@@ -73,6 +91,9 @@ pub(crate) enum Error<'src> {
   },
   Const {
     const_error: ConstError<'src>,
+  },
+  CurrentDirectory {
+    source: io::Error,
   },
   Cygpath {
     recipe: &'src str,
@@ -488,7 +509,29 @@ impl ColorDisplay for Error<'_> {
           "backtick succeeded but stdout was not utf8: {utf8_error}",
         )?,
       },
+      CacheEntryRead { path, source } => write!(
+        f,
+        "failed to read cache entry at `{}`: {source}",
+        path.display(),
+      )?,
+      CacheEntryWrite { path, source } => write!(
+        f,
+        "failed to write cache entry at `{}`: {source}",
+        path.display(),
+      )?,
+      CacheInputDirectory { path } => {
+        write!(f, "cache input is directory: `{}`", path.display())?;
+      }
+      CacheInputMissing { path } => {
+        write!(f, "cache input does not exist: `{}`", path.display())?;
+      }
       CacheKeySerialize { source } => write!(f, "failed to serialize cache key: {source}")?,
+      CacheOutputMissing { recipe, output } => {
+        write!(
+          f,
+          "recipe `{recipe}` failed to create cache output `{output}`",
+        )?;
+      }
       ChooserInvoke {
         shell_binary,
         shell_arguments,
@@ -555,6 +598,7 @@ impl ColorDisplay for Error<'_> {
       Compile { compile_error } => Display::fmt(compile_error, f)?,
       Config { config_error } => Display::fmt(config_error, f)?,
       Const { const_error } => write!(f, "{const_error}")?,
+      CurrentDirectory { source } => write!(f, "failed to get current directory: {source}")?,
       Cygpath {
         recipe,
         output_error,

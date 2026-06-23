@@ -1,14 +1,6 @@
 use super::*;
 
 const DIR: &str = ".justcache";
-const VERSION: u64 = 0;
-
-#[derive(Serialize)]
-struct Key<'a> {
-  lines: &'a [String],
-  recipe: &'a Modulepath,
-  version: u64,
-}
 
 pub(crate) struct Cache {
   initialized: Mutex<bool>,
@@ -18,15 +10,9 @@ pub(crate) struct Cache {
 impl Cache {
   pub(crate) fn status(
     &self,
-    recipe: &Recipe,
-    lines: &[String],
+    key: CacheKey,
+    outputs: &BTreeMap<String, PathBuf>,
   ) -> RunResult<'static, CacheStatus> {
-    let key = Key {
-      lines,
-      recipe: recipe.recipe_path(),
-      version: VERSION,
-    };
-
     let mut hasher = blake3::Hasher::new();
 
     serde_json::to_writer(&mut hasher, &key)
@@ -51,18 +37,30 @@ impl Cache {
 
     file.lock().map_err(context)?;
 
-    let len = file.metadata().map_err(context)?.len();
-
-    if len > 0 {
-      Ok(CacheStatus::Hit)
-    } else {
-      Ok(CacheStatus::Miss(CacheEntry { file, path }))
+    if file.metadata().map_err(context)?.len() == 0 {
+      return Ok(CacheStatus::Miss(CacheLock {
+        file,
+        path,
+        recipe: key.recipe.clone(),
+      }));
     }
+
+    for output in outputs.values() {
+      if !filesystem::exists(output)? {
+        return Ok(CacheStatus::Miss(CacheLock {
+          file,
+          path,
+          recipe: key.recipe.clone(),
+        }));
+      }
+    }
+
+    Ok(CacheStatus::Hit)
   }
 
   pub(crate) fn new(search: &Search) -> Self {
     Self {
-      path: search.justfile_parent().join(DIR),
+      path: Self::dir(search),
       initialized: Mutex::new(false),
     }
   }
@@ -79,5 +77,45 @@ impl Cache {
     }
 
     Ok(self.path.join(format!("{key}.json")))
+  }
+
+  pub(crate) fn inputs(
+    value: Value,
+    working_directory: &Path,
+  ) -> RunResult<'static, BTreeMap<String, blake3::Hash>> {
+    let mut inputs = BTreeMap::new();
+
+    for input in value.elements() {
+      let path = working_directory.join(input);
+
+      let metadata = match fs::metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(source) if source.kind() == io::ErrorKind::NotFound => {
+          return Err(Error::CacheInputMissing { path });
+        }
+        Err(source) => return Err(Error::FilesystemIo { source, path }),
+      };
+
+      if metadata.is_dir() {
+        return Err(Error::CacheInputDirectory { path });
+      }
+
+      let mut hasher = blake3::Hasher::new();
+
+      hasher
+        .update_mmap_rayon(&path)
+        .map_err(|source| Error::FilesystemIo {
+          source,
+          path: path.clone(),
+        })?;
+
+      inputs.insert(input.into(), hasher.finalize());
+    }
+
+    Ok(inputs)
+  }
+
+  pub(crate) fn dir(search: &Search) -> PathBuf {
+    search.justfile_parent().join(DIR)
   }
 }

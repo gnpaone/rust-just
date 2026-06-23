@@ -9,12 +9,11 @@ log := "warn"
 export JUST_LOG := log
 
 [group: 'dev']
-watch +args='ltest':
+watch +args='lcheck':
   cargo watch --clear --exec '{{ args }}'
 
 [group: 'test']
-test:
-  cargo ltest --all
+test: (watch 'ltest --tests --all --all-targets')
 
 [group: 'check']
 check: (watch 'lcheck --tests --all --all-targets')
@@ -35,8 +34,7 @@ run:
 
 # only run tests matching `PATTERN`
 [group: 'test']
-filter PATTERN:
-  cargo ltest {{PATTERN}}
+filter PATTERN: (watch f'ltest --tests --all --all-targets {{PATTERN}}')
 
 [group: 'misc']
 build:

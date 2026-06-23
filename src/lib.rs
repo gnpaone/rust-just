@@ -13,11 +13,13 @@ pub(crate) use {
     assignment::Assignment,
     assignment_resolver::AssignmentResolver,
     ast::Ast,
-    attribute::{Attribute, AttributeDiscriminant},
+    attribute::{Attribute, AttributeKind},
     attribute_set::AttributeSet,
     binding::Binding,
     cache::Cache,
     cache_entry::CacheEntry,
+    cache_key::CacheKey,
+    cache_lock::CacheLock,
     cache_status::CacheStatus,
     color::Color,
     color_display::ColorDisplay,
@@ -41,6 +43,7 @@ pub(crate) use {
     dump_format::DumpFormat,
     element::Element,
     enclosure::Enclosure,
+    environment::Environment,
     error::Error,
     evaluate_format::EvaluateFormat,
     evaluator::Evaluator,
@@ -135,7 +138,7 @@ pub(crate) use {
   rand::seq::IndexedRandom,
   regex::Regex,
   serde::{
-    Deserialize, Serialize, Serializer,
+    Deserialize, Deserializer, Serialize, Serializer,
     ser::{SerializeMap, SerializeSeq, SerializeStruct},
   },
   snafu::{ResultExt, Snafu},
@@ -217,6 +220,8 @@ mod attribute_set;
 mod binding;
 mod cache;
 mod cache_entry;
+mod cache_key;
+mod cache_lock;
 mod cache_status;
 mod color;
 mod color_display;
@@ -240,6 +245,7 @@ mod disabled;
 mod dump_format;
 mod element;
 mod enclosure;
+mod environment;
 mod error;
 mod evaluate_format;
 mod evaluator;
