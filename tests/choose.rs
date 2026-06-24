@@ -85,7 +85,13 @@ fn recipes_in_submodules_can_be_chosen() {
   Test::new()
     .arg("--choose")
     .env("JUST_CHOOSER", "head -n10")
-    .write("bar.just", "baz:\n echo BAZ")
+    .write(
+      "bar.just",
+      "
+        baz:
+         echo BAZ
+      ",
+    )
     .justfile(
       "
         mod bar
@@ -177,10 +183,13 @@ fn status_error() {
   if cfg!(windows) {
     return;
   }
-  let tmp = temptree! {
-    justfile: "foo:\n echo foo\nbar:\n echo bar\n",
-    "exit-2": "#!/usr/bin/env bash\nexit 2\n",
-  };
+  let tmp = tempdir();
+  fs::write(
+    tmp.path().join("justfile"),
+    "foo:\n echo foo\nbar:\n echo bar\n",
+  )
+  .unwrap();
+  fs::write(tmp.path().join("exit-2"), "#!/usr/bin/env bash\nexit 2\n").unwrap();
 
   let output = Command::new("chmod")
     .arg("+x")
@@ -219,10 +228,17 @@ fn cancelled_by_user() {
     return;
   }
 
-  let tmp = temptree! {
-    justfile: "foo:\n echo foo\nbar:\n echo bar\n",
-    chooser: "#!/usr/bin/env bash\nexit 130\n",
-  };
+  let tmp = tempdir();
+  fs::write(
+    tmp.path().join("justfile"),
+    "foo:\n echo foo\nbar:\n echo bar\n",
+  )
+  .unwrap();
+  fs::write(
+    tmp.path().join("chooser"),
+    "#!/usr/bin/env bash\nexit 130\n",
+  )
+  .unwrap();
 
   let output = Command::new("chmod")
     .arg("+x")
@@ -249,7 +265,13 @@ fn cancelled_by_user() {
 fn chooser_selections_are_processed_separately() {
   Test::new()
     .args(["--choose", "--chooser", "cat"])
-    .write("sub.just", "bar:\n @echo bar\n")
+    .write(
+      "sub.just",
+      "
+        bar:
+         @echo bar
+      ",
+    )
     .justfile(
       "
         mod sub
@@ -284,9 +306,8 @@ fn filter_by_group() {
 
 #[test]
 fn default() {
-  let tmp = temptree! {
-    justfile: "foo:\n echo foo\n",
-  };
+  let tmp = tempdir();
+  fs::write(tmp.path().join("justfile"), "foo:\n echo foo\n").unwrap();
 
   let cat = which("cat").unwrap();
   let fzf = tmp.path().join(format!("fzf{EXE_SUFFIX}"));

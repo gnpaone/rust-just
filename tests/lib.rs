@@ -1,10 +1,5 @@
 use {
-  crate::{
-    assert_stdout::assert_stdout,
-    assert_success::assert_success,
-    tempdir::tempdir,
-    test::{Output, Test, assert_eval_eq, assert_list_eq},
-  },
+  crate::{output::Output, tempdir::tempdir, test::Test},
   just::{Response, unindent},
   pretty_assertions::Comparison,
   regex::Regex,
@@ -24,13 +19,48 @@ use {
     time::{Duration, Instant},
   },
   tempfile::TempDir,
-  temptree::{Tree, temptree, tree},
   which::which,
 };
 
 const FALSE: &str = "[]";
 const JUST: &str = env!("CARGO_BIN_EXE_just");
 const TRUE: &str = "\"true\"";
+
+#[track_caller]
+fn assert_eval_eq(expression: &str, result: &str) {
+  Test::new()
+    .justfile(format!("x := {expression}"))
+    .args(["--evaluate", "x"])
+    .stdout(result)
+    .unindent_stdout(false)
+    .success();
+}
+
+#[track_caller]
+fn assert_list_eq(expression: &str, result: &str) {
+  Test::new()
+    .justfile(format!("set lists\n\nx := show({expression})"))
+    .env("JUST_UNSTABLE", "1")
+    .args(["--evaluate", "x"])
+    .stdout(result)
+    .unindent_stdout(false)
+    .success();
+}
+
+#[track_caller]
+fn assert_stdout(output: &std::process::Output, stdout: &str) {
+  assert_success(output);
+  assert_eq!(String::from_utf8_lossy(&output.stdout), stdout);
+}
+
+#[track_caller]
+fn assert_success(output: &std::process::Output) {
+  if !output.status.success() {
+    eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+    eprintln!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+    panic!("{}", output.status);
+  }
+}
 
 fn default<T: Default>() -> T {
   Default::default()
@@ -45,8 +75,6 @@ mod allow_duplicate_recipes;
 mod allow_duplicate_variables;
 mod allow_missing;
 mod arg_attribute;
-mod assert_stdout;
-mod assert_success;
 mod assertions;
 mod assignment;
 mod attributes;
@@ -102,6 +130,7 @@ mod logical_operators;
 mod man;
 mod mapped_dependencies;
 mod markdown;
+mod minimum_version;
 mod misc;
 mod modules;
 mod multibyte_char;
@@ -115,6 +144,7 @@ mod no_exit_message;
 mod non_unicode;
 mod options;
 mod os_attributes;
+mod output;
 mod overrides;
 mod parallel;
 mod parameters;

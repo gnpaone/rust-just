@@ -3,12 +3,6 @@ use {
   pretty_assertions::{StrComparison, assert_eq},
 };
 
-pub(crate) struct Output {
-  pub(crate) pid: u32,
-  pub(crate) stdout: String,
-  pub(crate) tempdir: TempDir,
-}
-
 #[must_use]
 pub(crate) struct Test {
   pub(crate) args: Vec<String>,
@@ -152,21 +146,15 @@ impl Test {
     self
   }
 
-  pub(crate) fn tree(self, mut tree: Tree) -> Self {
-    tree.map(|_name, content| unindent(content));
-    tree.instantiate(self.tempdir.path()).unwrap();
-    self
-  }
-
   pub(crate) fn unindent_stdout(mut self, unindent_stdout: bool) -> Self {
     self.unindent_stdout = unindent_stdout;
     self
   }
 
-  pub(crate) fn write(self, path: impl AsRef<Path>, content: impl AsRef<[u8]>) -> Self {
+  pub(crate) fn write(self, path: impl AsRef<Path>, content: &str) -> Self {
     let path = self.tempdir.path().join(path);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
-    fs::write(path, content).unwrap();
+    fs::write(path, unindent(content)).unwrap();
     self
   }
 
@@ -363,23 +351,4 @@ impl Test {
 
     assert_eq!(reparsed, dumped, "reparse mismatch");
   }
-}
-
-pub(crate) fn assert_eval_eq(expression: &str, result: &str) {
-  Test::new()
-    .justfile(format!("x := {expression}"))
-    .args(["--evaluate", "x"])
-    .stdout(result)
-    .unindent_stdout(false)
-    .success();
-}
-
-pub(crate) fn assert_list_eq(expression: &str, result: &str) {
-  Test::new()
-    .justfile(format!("set lists\n\nx := show({expression})"))
-    .env("JUST_UNSTABLE", "1")
-    .args(["--evaluate", "x"])
-    .stdout(result)
-    .unindent_stdout(false)
-    .success();
 }
