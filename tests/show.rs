@@ -60,12 +60,11 @@ fn show_suggestion() {
     .arg("--show")
     .arg("hell")
     .justfile(
-      r#"
-        hello a b='B	' c='C':
-          echo {{a}} {{b}} {{c}}
+      "
+        hello:
 
-        a Z="\t z":
-      "#,
+        a:
+      ",
     )
     .stderr("error: justfile does not contain recipe `hell`\nDid you mean `hello`?\n")
     .failure();
@@ -77,14 +76,13 @@ fn show_alias_suggestion() {
     .arg("--show")
     .arg("fo")
     .justfile(
-      r#"
-        hello a b='B	' c='C':
-          echo {{a}} {{b}} {{c}}
+      "
+        hello:
 
         alias foo := hello
 
-        a Z="\t z":
-      "#,
+        a:
+      ",
     )
     .stderr(
       "
@@ -101,12 +99,11 @@ fn show_no_suggestion() {
     .arg("--show")
     .arg("hell")
     .justfile(
-      r#"
-        helloooooo a b='B	' c='C':
-          echo {{a}} {{b}} {{c}}
+      "
+        helloooooo:
 
-        a Z="\t z":
-      "#,
+        a:
+      ",
     )
     .stderr("error: justfile does not contain recipe `hell`\n")
     .failure();
@@ -118,14 +115,13 @@ fn show_no_alias_suggestion() {
     .arg("--show")
     .arg("fooooooo")
     .justfile(
-      r#"
-        hello a b='B	' c='C':
-          echo {{a}} {{b}} {{c}}
+      "
+        hello:
 
         alias foo := hello
 
-        a Z="\t z":
-      "#,
+        a:
+      ",
     )
     .stderr("error: justfile does not contain recipe `fooooooo`\n")
     .failure();
@@ -134,7 +130,13 @@ fn show_no_alias_suggestion() {
 #[test]
 fn show_recipe_at_path() {
   Test::new()
-    .write("foo.just", "bar:\n @echo MODULE")
+    .write(
+      "foo.just",
+      "
+        bar:
+         @echo MODULE
+      ",
+    )
     .justfile(
       "
         mod foo
@@ -156,7 +158,13 @@ fn show_invalid_path() {
 #[test]
 fn show_space_separated_path() {
   Test::new()
-    .write("foo.just", "bar:\n @echo MODULE")
+    .write(
+      "foo.just",
+      "
+        bar:
+         @echo MODULE
+      ",
+    )
     .justfile(
       "
         mod foo
@@ -171,7 +179,13 @@ fn show_space_separated_path() {
 fn show_recipe_in_search_directory() {
   Test::new()
     .justfile("foo:\n @echo ROOT")
-    .write("child/justfile", "foo:\n @echo CHILD")
+    .write(
+      "child/justfile",
+      "
+        foo:
+         @echo CHILD
+      ",
+    )
     .current_dir("child")
     .args(["--show", "../foo"])
     .stdout("foo:\n    @echo ROOT\n")

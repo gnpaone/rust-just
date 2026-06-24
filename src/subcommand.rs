@@ -680,7 +680,11 @@ impl Subcommand {
       BTreeMap::new()
     } else {
       let mut aliases = BTreeMap::<&str, Vec<&str>>::new();
-      for alias in module.aliases.values().filter(|alias| alias.is_public()) {
+      for alias in module
+        .recipe_aliases
+        .values()
+        .filter(|alias| alias.is_public())
+      {
         aliases
           .entry(alias.target.name.lexeme())
           .or_default()
@@ -968,7 +972,7 @@ impl Subcommand {
   fn resolve_path<'src, 'run>(
     mut module: &'run Justfile<'src>,
     path: &Modulepath,
-  ) -> RunResult<'src, (Option<&'run Alias<'src>>, &'run Recipe<'src>)> {
+  ) -> RunResult<'src, (Option<&'run RecipeAlias<'src>>, &'run Recipe<'src>)> {
     for name in &path.components[0..path.components.len() - 1] {
       if let Some(submodule) = module.modules.get(name) {
         module = submodule;
@@ -985,9 +989,9 @@ impl Subcommand {
 
     let name = path.components.last().unwrap();
 
-    if let Some(alias) = module.get_alias(name) {
+    if let Some(alias) = module.recipe_alias(name) {
       Ok((Some(alias), &alias.target))
-    } else if let Some(recipe) = module.get_recipe(name) {
+    } else if let Some(recipe) = module.recipe(name) {
       Ok((None, recipe))
     } else {
       Err(Error::UnknownRecipe {

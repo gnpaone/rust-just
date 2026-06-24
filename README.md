@@ -1019,6 +1019,18 @@ mod foo
 alias baz := foo::bar
 ```
 
+Or a module<sup>master</sup>:
+
+```justfile
+mod frontend
+
+alias f := frontend
+```
+
+```console
+$ just f build
+```
+
 ### Settings
 
 Settings control interpretation and execution. Each setting may be specified at
@@ -1042,17 +1054,19 @@ foo:
 | `allow-duplicate-variables` | boolean | `false` | Allow variables appearing later in a `justfile` to override earlier variables with the same name. |
 | `default-list` | boolean | `false` | List recipes instead of running the default recipe. |
 | `default-script`<sup>1.52.0</sup> | boolean | `false` | Default recipes to script instead of shell. |
-| `dotenv-command`<sup>master</sup> | string | - | Run a command and load its output as an environment file. |
+| `dotenv-command`<sup>1.54.0</sup> | string | - | Run a command and load its output as an environment file. |
 | `dotenv-filename` | string | - | Load a `.env` file with a custom name, if present. |
 | `dotenv-load` | boolean | `false` | Load a `.env` file, if present. |
 | `dotenv-override` | boolean | `false` | Override existing environment variables with values from the `.env` file. |
 | `dotenv-path` | string | - | Load a `.env` file from a custom path and error if not present. Overrides `dotenv-filename`. |
 | `dotenv-required` | boolean | `false` | Error if a `.env` file isn't found. |
 | `export` | boolean | `false` | Export all variables as environment variables. |
-| `fallback` | boolean | `false` | Search `justfile` in parent directory if the first recipe on the command line is not found. |
+| `fallback` | boolean | `false` | Search for `justfile` in parent directory if the first recipe on the command line is not found. |
+| `guards`<sup>1.47.0</sup> | boolean | `false` | Enable the `?` guard sigil on recipe lines. See [sigils](#sigils). |
 | `ignore-comments` | boolean | `false` | Ignore recipe lines beginning with `#`. |
 | `lazy`<sup>1.47.0</sup> | boolean | `false` | Don't evaluate unused variables. |
 | `lists`<sup>1.53.0</sup> | boolean | `false` | Values may be lists of strings instead of strings. Currently unstable. |
+| `minimum-version`<sup>master</sup> | string | - | Error if `just` is older than `minimum-version`. Accepts a string of the form `MAJOR.MINOR.PATCH`, e.g., `"1.55.0"`. |
 | `no-cd`<sup>1.51.0</sup> | boolean | `false` | Don't change directory when executing recipes by recipe attribute. |
 | `no-exit-message`<sup>1.39.0</sup> | boolean | `false` | Don't print exit messages if recipes fail. |
 | `positional-arguments` | boolean | `false` | Pass positional arguments. |
@@ -1457,6 +1471,27 @@ set lists
 [arg('bar', long)]
 foo bar=[]:
 ```
+
+#### Requiring a Minimum Just Version
+
+If you use features of `just` which require a particular version, you may use
+the `minimum-version`<sup>master</sup> setting to make it an error to use older
+versions of `just`:
+
+```justfile
+set minimum-version := <sup>master</sup>
+```
+
+If `just` encounters a minimum version greater than its own version, it will
+print an error message with the required version, which is hopefully better
+than the confused error message it would have otherwise produced.
+
+The `minimum-version` setting should be placed at the top of the `justfile`,
+before any usage of the new feature that it guards.
+
+Any features which change the lexer in forward-incompatible ways will still
+produce an unhelpful error message, as the minimum version check is implemented
+in the parser, which runs after the lexer.
 
 #### Positional Arguments
 
@@ -2570,10 +2605,10 @@ change their behavior.
 | `[arg(ARG, pattern="PATTERN")]`<sup>1.45.0</sup> | recipe | Require values of argument `ARG` to match regular expression `PATTERN`. |
 | `[arg(ARG, short="S")]`<sup>1.46.0</sup> | recipe | Require values of argument `ARG` to be passed as short `-S` option. |
 | `[arg(ARG, value=VALUE)]`<sup>1.46.0</sup> | recipe | Makes option `ARG` a flag which does not take a value. |
-| `[cache]`<sup>master</sup> | recipe | Skip recipe invocations when a matching entry exists in the cache. See [cached recipes](#cached-recipes) for details. Currently unstable. |
+| `[cache]`<sup>1.54.0</sup> | recipe | Skip recipe invocations when a matching entry exists in the cache. See [cached recipes](#cached-recipes) for details. Currently unstable. |
 | `[confirm(PROMPT)]`<sup>1.23.0</sup> | recipe | Require confirmation prior to executing recipe with a custom prompt. |
 | `[confirm]`<sup>1.17.0</sup> | recipe | Require confirmation prior to executing recipe. |
-| `[continue(SIGNALS)]`<sup>master</sup> | recipe | Continue execution normally if a command is interrupted by any of `SIGNALS` and exits successfully. Defaults to `SIGINT`. |
+| `[continue(SIGNALS)]`<sup>1.54.0</sup> | recipe | Continue execution normally if a command is interrupted by any of `SIGNALS` and exits successfully. Defaults to `SIGINT`. |
 | `[default]`<sup>1.43.0</sup> | recipe | Use recipe as module's default recipe. |
 | `[doc(DOC)]`<sup>1.27.0</sup> | module, recipe | Set recipe or module's [documentation comment](#documentation-comments) to `DOC`. |
 | `[dragonfly]`<sup>1.47.0</sup> | recipe | Enable recipe on DragonFly BSD. |
@@ -3335,7 +3370,7 @@ Variadic `*` and `+` parameters cannot be options.
 
 The `[arg(ARG, value=VALUE, …)]`<sup>1.46.0</sup> attribute can be used with
 `long` or `short` to make a parameter a flag which does not take a value.
-`VALUE` may be an expression<sup>master</sup>.
+`VALUE` may be an expression<sup>1.54.0</sup>.
 
 In this `justfile`:
 
@@ -4085,7 +4120,7 @@ Consult `just --help` for which options can be set with environment variables.
 ### Cached Recipes
 
 `just` will skip invocations of recipes with the `[cache]`
-attribute<sup>master</sup> if it finds an entry matching the invocation in the
+attribute<sup>1.54.0</sup> if it finds an entry matching the invocation in the
 cache. The `[cache]` attribute may only be used with script recipes and is
 currently unstable.
 
@@ -4109,6 +4144,9 @@ The keys of the cache key object are:
 - `positional`: positional arguments
 - `recipe`: `::`-separated module path to invoked recipe
 - `working_directory`: current working directory
+
+Cache key objects for invoked recipes can be printed to standard error with
+`just -vv`.
 
 The value of `extra` may be supplied with `[cache(extra = EXPRESSION)]`, where
 `EXPRESSION` is an arbitrary expression evaluated with recipe arguments in
@@ -4972,7 +5010,7 @@ receives a fatal signal, `just` halts execution.
 
 #### Continuing Execution
 
-The `[continue]`<sup>master</sup> attribute can be used to make `just` continue
+The `[continue]`<sup>1.54.0</sup> attribute can be used to make `just` continue
 execution even if it receives a fatal signal as long as the child process it's
 running exits successfully.
 
