@@ -62,6 +62,7 @@ pub(crate) use {
     justfile::Justfile,
     keyed::Keyed,
     keyword::Keyword,
+    layer::Layer,
     lexer::Lexer,
     line::Line,
     list::List,
@@ -113,6 +114,7 @@ pub(crate) use {
     string_kind::StringKind,
     string_literal::StringLiteral,
     string_state::StringState,
+    style::Style,
     subcommand::Subcommand,
     suggestion::Suggestion,
     switch::Switch,
@@ -270,6 +272,7 @@ mod item;
 mod justfile;
 mod keyed;
 mod keyword;
+mod layer;
 mod lexer;
 mod line;
 mod list;
@@ -323,6 +326,7 @@ mod string_delimiter;
 mod string_kind;
 mod string_literal;
 mod string_state;
+mod style;
 mod subcommand;
 mod suggestion;
 mod switch;
