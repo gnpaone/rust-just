@@ -25,14 +25,14 @@ fn pattern_mismatch() {
     .args(["foo", "bar"])
     .stderr(
       "
-        error: argument `bar` passed to recipe `foo` parameter `bar` does not match pattern 'BAR'
+        error: argument `bar` passed to recipe `foo` parameter `bar` does not match pattern `BAR`
       ",
     )
     .failure();
 }
 
 #[test]
-fn patterns_are_regulare_expressions() {
+fn patterns_are_regular_expressions() {
   Test::new()
     .justfile(
       r"
@@ -43,7 +43,7 @@ fn patterns_are_regulare_expressions() {
     .args(["foo", r"\d+"])
     .stderr(
       r"
-        error: argument `\d+` passed to recipe `foo` parameter `bar` does not match pattern '\d+'
+        error: argument `\d+` passed to recipe `foo` parameter `bar` does not match pattern `\d+`
       ",
     )
     .failure();
@@ -61,7 +61,7 @@ fn pattern_must_match_entire_string() {
     .args(["foo", "xbarx"])
     .stderr(
       "
-        error: argument `xbarx` passed to recipe `foo` parameter `bar` does not match pattern 'bar'
+        error: argument `xbarx` passed to recipe `foo` parameter `bar` does not match pattern `bar`
       ",
     )
     .failure();
@@ -79,14 +79,151 @@ fn pattern_invalid_regex_error() {
     .stderr(
       "
         error: failed to parse argument pattern
-         ——▶ justfile:1:21
+         ——▶ justfile:1:13
           │
         1 │ [arg('bar', pattern='{')]
-          │                     ^^^
+          │             ^^^^^^^
         caused by: regex parse error:
             {
             ^
         error: repetition operator missing expression
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn pattern_may_be_expression() {
+  Test::new()
+    .justfile(
+      "
+        prefix := 'B'
+        [arg('bar', pattern=prefix + 'AR')]
+        foo bar:
+      ",
+    )
+    .args(["foo", "bar"])
+    .stderr(
+      "
+        error: argument `bar` passed to recipe `foo` parameter `bar` does not match pattern `BAR`
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn pattern_cannot_reference_parameter() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', pattern=bar)]
+        foo bar:
+      ",
+    )
+    .stderr(
+      "
+        error: variable `bar` not defined
+         ——▶ justfile:1:21
+          │
+        1 │ [arg('bar', pattern=bar)]
+          │                     ^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn pattern_cannot_reference_undefined_variable() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', pattern=undefined)]
+        foo bar:
+      ",
+    )
+    .stderr(
+      "
+        error: variable `undefined` not defined
+         ——▶ justfile:1:21
+          │
+        1 │ [arg('bar', pattern=undefined)]
+          │                     ^^^^^^^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn pattern_list_match() {
+  Test::new()
+    .justfile(
+      "
+          set lists
+          [arg('bar', pattern=['A', 'B'])]
+          foo bar:
+        ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .args(["foo", "A"])
+    .success()
+    .test()
+    .env("JUST_UNSTABLE", "1")
+    .args(["foo", "B"])
+    .success();
+}
+
+#[test]
+fn pattern_list_mismatch() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+        [arg('bar', pattern=['A', 'B'])]
+        foo bar:
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .args(["foo", "C"])
+    .stderr(
+      "
+        error: argument `C` passed to recipe `foo` parameter `bar` does not match pattern `A` or `B`
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn pattern_empty_list_accepts_all_arguments() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+        [arg('bar', pattern=[])]
+        foo bar:
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .args(["foo", "anything"])
+    .success();
+}
+
+#[test]
+fn pattern_cannot_reference_non_const_variable() {
+  Test::new()
+    .justfile(
+      "
+        bar := `echo BAR`
+        [arg('bar', pattern=bar)]
+        foo bar:
+      ",
+    )
+    .stderr(
+      "
+        error: cannot access non-const variable `bar` in const context
+         ——▶ justfile:2:21
+          │
+        2 │ [arg('bar', pattern=bar)]
+          │                     ^^^
       ",
     )
     .failure();
@@ -171,7 +308,7 @@ fn pattern_mismatches_are_caught_before_running_dependencies() {
     .args(["foo", "bar"])
     .stderr(
       "
-        error: argument `bar` passed to recipe `foo` parameter `bar` does not match pattern 'BAR'
+        error: argument `bar` passed to recipe `foo` parameter `bar` does not match pattern `BAR`
       ",
     )
     .failure();
@@ -192,7 +329,7 @@ fn pattern_mismatches_are_caught_before_running_invocation() {
     .args(["baz", "foo", "bar"])
     .stderr(
       "
-        error: argument `bar` passed to recipe `foo` parameter `bar` does not match pattern 'BAR'
+        error: argument `bar` passed to recipe `foo` parameter `bar` does not match pattern `BAR`
       ",
     )
     .failure();
@@ -211,7 +348,7 @@ fn pattern_mismatches_are_caught_in_evaluated_arguments() {
     )
     .stderr(
       "
-        error: argument `bar` passed to recipe `foo` parameter `bar` does not match pattern 'BAR'
+        error: argument `bar` passed to recipe `foo` parameter `bar` does not match pattern `BAR`
       ",
     )
     .failure();
@@ -229,7 +366,7 @@ fn alternates_do_not_bind_to_anchors() {
     .args(["foo", "aa"])
     .stderr(
       "
-        error: argument `aa` passed to recipe `foo` parameter `bar` does not match pattern 'a|b'
+        error: argument `aa` passed to recipe `foo` parameter `bar` does not match pattern `a|b`
       ",
     )
     .failure();
@@ -260,7 +397,25 @@ fn pattern_mismatch_variadic() {
     .args(["foo", "BAR", "BAR"])
     .stderr(
       "
-        error: argument `BAR` passed to recipe `foo` parameter `bar` does not match pattern 'BAR BAR'
+        error: argument `BAR` passed to recipe `foo` parameter `bar` does not match pattern `BAR BAR`
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn pattern_mismatch_repeatable_option() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', long='bar', pattern='BAR')]
+        foo +bar:
+      ",
+    )
+    .args(["foo", "--bar", "BAR", "--bar", "BAZ"])
+    .stderr(
+      "
+        error: argument `BAZ` passed to recipe `foo` parameter `bar` does not match pattern `BAR`
       ",
     )
     .failure();
@@ -288,27 +443,6 @@ fn pattern_requires_value() {
 }
 
 #[test]
-fn short_requires_value() {
-  Test::new()
-    .justfile(
-      "
-        [arg('bar', short)]
-        foo bar:
-      ",
-    )
-    .stderr(
-      "
-        error: attribute key `short` requires value
-         ——▶ justfile:1:13
-          │
-        1 │ [arg('bar', short)]
-          │             ^^^^^
-      ",
-    )
-    .failure();
-}
-
-#[test]
 fn value_requires_value() {
   Test::new()
     .justfile(
@@ -327,4 +461,136 @@ fn value_requires_value() {
       ",
     )
     .failure();
+}
+
+#[test]
+fn help_cannot_reference_parameter() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', help=bar)]
+        foo bar:
+      ",
+    )
+    .stderr(
+      "
+        error: variable `bar` not defined
+         ——▶ justfile:1:18
+          │
+        1 │ [arg('bar', help=bar)]
+          │                  ^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn help_cannot_reference_undefined_variable() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', help=undefined)]
+        foo bar:
+      ",
+    )
+    .stderr(
+      "
+        error: variable `undefined` not defined
+         ——▶ justfile:1:18
+          │
+        1 │ [arg('bar', help=undefined)]
+          │                  ^^^^^^^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn help_cannot_reference_non_const_variable() {
+  Test::new()
+    .justfile(
+      "
+        bar := `echo BAR`
+        [arg('bar', help=bar)]
+        foo bar:
+      ",
+    )
+    .stderr(
+      "
+        error: cannot access non-const variable `bar` in const context
+         ——▶ justfile:2:18
+          │
+        2 │ [arg('bar', help=bar)]
+          │                  ^^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn help_may_be_expression() {
+  Test::new()
+    .justfile(
+      "
+        prefix := 'hello '
+        [arg('bar', help=prefix + 'world')]
+        foo bar:
+      ",
+    )
+    .args(["--usage", "foo"])
+    .stdout(
+      "
+        Usage: just foo bar
+
+        Arguments:
+          bar hello world
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn help_list_is_joined() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+        [arg('bar', help=['hello', 'world'])]
+        foo bar:
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .args(["--usage", "foo"])
+    .stdout(
+      "
+        Usage: just foo bar
+
+        Arguments:
+          bar hello world
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn help_empty_list_is_no_help() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+        [arg('bar', help=[])]
+        foo bar:
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .args(["--usage", "foo"])
+    .stdout(
+      "
+        Usage: just foo bar
+
+        Arguments:
+          bar
+      ",
+    )
+    .success();
 }

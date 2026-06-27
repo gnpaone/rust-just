@@ -14,13 +14,19 @@ pub(crate) enum Attribute<'src> {
   Arg {
     #[serde(skip)]
     flag: Option<Token<'src>>,
-    help: Option<StringLiteral<'src>>,
+    help: Option<String>,
+    #[serde(skip)]
+    help_property: Option<(Name<'src>, Expression<'src>)>,
     long: Option<StringLiteral<'src>>,
     #[serde(skip)]
-    long_key: Option<Token<'src>>,
+    long_key: Option<Name<'src>>,
     name: StringLiteral<'src>,
-    pattern: Option<Pattern<'src>>,
+    pattern: Option<Pattern>,
+    #[serde(skip)]
+    pattern_property: Option<(Name<'src>, Expression<'src>)>,
     short: Option<StringLiteral<'src>>,
+    #[serde(skip)]
+    short_key: Option<Name<'src>>,
     value: Option<Expression<'src>>,
   },
   Cache {
@@ -187,35 +193,37 @@ impl<'src> Attribute<'src> {
               Self::check_option_name(&arg, &literal)?;
               Ok((Some(literal), None))
             } else {
-              Ok((Some(arg.clone()), Some(*key)))
+              Ok((Some(arg.clone()), Some(key)))
             }
           })
           .transpose()?
-          .unwrap_or((None, None));
+          .unwrap_or_default();
 
-        let short = Self::remove_required(&mut keyword_arguments, "short")?
+        let (short, short_key) = keyword_arguments
+          .remove("short")
           .map(|(key, expression)| {
-            let literal = Self::require_string_literal(name, key, expression)?;
+            if let Some(expression) = expression {
+              let literal = Self::require_string_literal(name, key, expression)?;
 
-            Self::check_option_name(&arg, &literal)?;
+              Self::check_option_name(&arg, &literal)?;
 
-            if literal.cooked.chars().count() != 1 {
-              return Err(literal.token.error(
-                CompileErrorKind::ShortOptionWithMultipleCharacters {
-                  parameter: arg.cooked.clone(),
-                },
-              ));
+              if literal.cooked.chars().count() != 1 {
+                return Err(literal.token.error(
+                  CompileErrorKind::ShortOptionWithMultipleCharacters {
+                    parameter: arg.cooked.clone(),
+                  },
+                ));
+              }
+
+              Ok((Some(literal), None))
+            } else {
+              Ok((Some(arg.clone()), Some(key)))
             }
-
-            Ok(literal)
           })
-          .transpose()?;
+          .transpose()?
+          .unwrap_or_default();
 
-        let pattern = Self::remove_required(&mut keyword_arguments, "pattern")?
-          .map(|(key, expression)| {
-            Pattern::new(&Self::require_string_literal(name, key, expression)?)
-          })
-          .transpose()?;
+        let pattern_property = Self::remove_required(&mut keyword_arguments, "pattern")?;
 
         let value = Self::remove_required(&mut keyword_arguments, "value")?
           .map(|(key, expression)| {
@@ -250,18 +258,19 @@ impl<'src> Attribute<'src> {
           })
           .transpose()?;
 
-        let help = Self::remove_required(&mut keyword_arguments, "help")?
-          .map(|(key, expression)| Self::require_string_literal(name, key, expression))
-          .transpose()?;
+        let help_property = Self::remove_required(&mut keyword_arguments, "help")?;
 
         Self::Arg {
           flag,
-          help,
+          help: None,
+          help_property,
           long,
           long_key,
           name: arg,
-          pattern,
+          pattern: None,
+          pattern_property,
           short,
+          short_key,
           value,
         }
       }
@@ -380,12 +389,15 @@ impl Display for Attribute<'_> {
     match self {
       Self::Arg {
         flag,
-        help,
+        help: _,
+        help_property,
         long,
         long_key,
         name,
-        pattern,
+        pattern: _,
+        pattern_property,
         short,
+        short_key,
         value,
       } => {
         write!(f, "({name}")?;
@@ -396,12 +408,14 @@ impl Display for Attribute<'_> {
           write!(f, ", long={long}")?;
         }
 
-        if let Some(short) = short {
+        if short_key.is_some() {
+          write!(f, ", short")?;
+        } else if let Some(short) = short {
           write!(f, ", short={short}")?;
         }
 
-        if let Some(pattern) = pattern {
-          write!(f, ", pattern={}", pattern.token.lexeme())?;
+        if let Some((_key, pattern)) = pattern_property {
+          write!(f, ", pattern={pattern}")?;
         }
 
         if let Some(value) = value {
@@ -412,7 +426,7 @@ impl Display for Attribute<'_> {
           write!(f, ", flag")?;
         }
 
-        if let Some(help) = help {
+        if let Some((_key, help)) = help_property {
           write!(f, ", help={help}")?;
         }
 
