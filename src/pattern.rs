@@ -1,65 +1,78 @@
 use super::*;
 
 #[derive(Debug, Clone)]
-pub(crate) struct Pattern<'src> {
-  pub(crate) regex: Regex,
-  pub(crate) token: Token<'src>,
+pub(crate) struct Pattern {
+  pub(crate) regexes: Vec<Regex>,
 }
 
-impl<'src> Pattern<'src> {
+impl Pattern {
   pub(crate) fn is_match(&self, haystack: &str) -> bool {
-    self.regex.is_match(haystack)
+    self.regexes.iter().any(|regex| regex.is_match(haystack))
   }
 
-  pub(crate) fn new(literal: &StringLiteral<'src>) -> Result<Self, CompileError<'src>> {
-    literal.cooked.parse::<Regex>().map_err(|source| {
-      literal
-        .token
-        .error(CompileErrorKind::ArgumentPatternRegex { source })
-    })?;
-
+  pub(crate) fn new<'src>(value: &Value, key: Name<'src>) -> Result<Self, CompileError<'src>> {
     Ok(Self {
-      regex: format!("^(?:{})$", literal.cooked)
-        .parse::<Regex>()
-        .map_err(|source| {
-          literal
-            .token
-            .error(CompileErrorKind::ArgumentPatternRegex { source })
-        })?,
-      token: literal.token,
+      regexes: value
+        .elements()
+        .iter()
+        .map(|element| {
+          element
+            .parse::<Regex>()
+            .map_err(|source| key.error(CompileErrorKind::ArgumentPatternRegex { source }))?;
+
+          format!("^(?:{element})$")
+            .parse()
+            .map_err(|source| key.error(CompileErrorKind::ArgumentPatternRegex { source }))
+        })
+        .collect::<Result<Vec<Regex>, CompileError>>()?,
     })
   }
 
-  pub(crate) fn original(&self) -> &str {
-    &self.regex.as_str()[4..self.regex.as_str().len() - 2]
+  pub(crate) fn originals(&self) -> impl Iterator<Item = &str> + Clone {
+    self.regexes.iter().map(|regex| {
+      regex
+        .as_str()
+        .strip_prefix("^(?:")
+        .unwrap()
+        .strip_suffix(")$")
+        .unwrap()
+    })
   }
 }
 
-impl Eq for Pattern<'_> {}
+impl Eq for Pattern {}
 
-impl Ord for Pattern<'_> {
+impl Ord for Pattern {
   fn cmp(&self, other: &pattern::Pattern) -> Ordering {
-    self.regex.as_str().cmp(other.regex.as_str())
+    self
+      .regexes
+      .iter()
+      .map(Regex::as_str)
+      .cmp(other.regexes.iter().map(Regex::as_str))
   }
 }
 
-impl PartialEq for Pattern<'_> {
+impl PartialEq for Pattern {
   fn eq(&self, other: &pattern::Pattern) -> bool {
-    self.regex.as_str() == other.regex.as_str()
+    self
+      .regexes
+      .iter()
+      .map(Regex::as_str)
+      .eq(other.regexes.iter().map(Regex::as_str))
   }
 }
 
-impl PartialOrd for Pattern<'_> {
+impl PartialOrd for Pattern {
   fn partial_cmp(&self, other: &pattern::Pattern) -> Option<Ordering> {
     Some(self.cmp(other))
   }
 }
 
-impl Serialize for Pattern<'_> {
+impl Serialize for Pattern {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
   where
     S: Serializer,
   {
-    serializer.serialize_str(self.original())
+    serializer.collect_seq(self.originals())
   }
 }

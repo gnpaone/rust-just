@@ -1648,6 +1648,25 @@ fn arg_attribute_long_bare() {
 }
 
 #[test]
+fn arg_attribute_short_bare() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', short)]
+        @foo bar:
+      ",
+    )
+    .arg("--dump")
+    .stdout(
+      "
+        [arg('bar', short)]
+        @foo bar:
+      ",
+    )
+    .success();
+}
+
+#[test]
 fn arg_attribute_pattern() {
   Test::new()
     .justfile(
@@ -1660,6 +1679,25 @@ fn arg_attribute_pattern() {
     .stdout(
       "
         [arg('bar', pattern='bar')]
+        @foo bar:
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn arg_attribute_pattern_expression() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', pattern='b' + 'ar')]
+        @foo bar:
+      ",
+    )
+    .arg("--dump")
+    .stdout(
+      "
+        [arg('bar', pattern='b' + 'ar')]
         @foo bar:
       ",
     )
@@ -1698,6 +1736,25 @@ fn arg_attribute_help() {
     .stdout(
       "
         [arg('bar', help='foo')]
+        @foo bar:
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn arg_attribute_help_expression() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', help='f' + 'oo')]
+        @foo bar:
+      ",
+    )
+    .arg("--dump")
+    .stdout(
+      "
+        [arg('bar', help='f' + 'oo')]
         @foo bar:
       ",
     )

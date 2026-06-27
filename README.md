@@ -1357,10 +1357,20 @@ commands earlier in the list.
 
 ##### Attributes
 
-The `[arg]` `flag` attribute makes the parameter a flag which does not take a
+The `[arg(flag)]` attribute makes the parameter a flag which does not take a
 value on the command line. For example, with `[arg('foo', long, flag)]`, `foo`
-will be `"true"` when `--foo` is passed, and `[]` otherwise. Flag parameters may
-not have a default.
+will be `"true"` when `--foo` is passed, and `[]` otherwise. Flag parameters
+may not have a default.
+
+The value of `[arg(help)]` may be a list, in which case the help string is the
+elements of the list joined with spaces. If the list is empty, the argument has
+no help string.
+
+The value of `[arg(pattern)]` may be a list, in which case the argument is
+accepted if it matches any pattern in the list. If the value is the empty list,
+any argument is accepted. For example, with
+`[arg('foo', pattern=['--help', '--version'])]`, `foo` may be `--help` or
+`--version`.
 
 In `[env(variable, value)]` if `value` is `[]`, `variable` is not set.
 Otherwise it is set to `value` joined with spaces.
@@ -2647,10 +2657,10 @@ change their behavior.
 
 | Name | Type | Description |
 |------|------|-------------|
-| `[arg(ARG, help="HELP")]`<sup>1.46.0</sup> | recipe | Print help string `HELP` for `ARG` in usage messages. |
-| `[arg(ARG, long="LONG")]`<sup>1.46.0</sup> | recipe | Require values of argument `ARG` to be passed as `--LONG` option. |
-| `[arg(ARG, pattern="PATTERN")]`<sup>1.45.0</sup> | recipe | Require values of argument `ARG` to match regular expression `PATTERN`. |
-| `[arg(ARG, short="S")]`<sup>1.46.0</sup> | recipe | Require values of argument `ARG` to be passed as short `-S` option. |
+| `[arg(ARG, help="HELP")]`<sup>1.46.0</sup> | recipe | Print help string `HELP` for `ARG` in usage messages. May be a const expression<sup>master</sup>. |
+| `[arg(ARG, long="LONG")]`<sup>1.46.0</sup> | recipe | Require values of argument `ARG` to be passed as `--LONG` option. If the parameter is variadic, the option is repeatable<sup>master</sup>. |
+| `[arg(ARG, pattern="PATTERN")]`<sup>1.45.0</sup> | recipe | Require values of argument `ARG` to match regular expression `PATTERN`. May be a const expression<sup>master</sup>. |
+| `[arg(ARG, short="S")]`<sup>1.46.0</sup> | recipe | Require values of argument `ARG` to be passed as short `-S` option. If the parameter is variadic, the option is repeatable<sup>master</sup>. |
 | `[arg(ARG, value=VALUE)]`<sup>1.46.0</sup> | recipe | Makes option `ARG` a flag which does not take a value. |
 | `[cache]`<sup>1.54.0</sup> | recipe | Skip recipe invocations when a matching entry exists in the cache. See [cached recipes](#cached-recipes) for details. Currently unstable. |
 | `[confirm(PROMPT)]`<sup>1.23.0</sup> | recipe | Require confirmation prior to executing recipe with a custom prompt. |
@@ -3293,13 +3303,15 @@ foo $bar:
 ```
 
 Parameters may be constrained to match regular expression patterns using the
-`[arg("name", pattern="pattern")]` attribute<sup>1.45.0</sup>:
+`[arg("name", pattern=PATTERN)]` attribute<sup>1.45.0</sup>:
 
 ```just
 [arg('n', pattern='\d+')]
 double n:
   echo $(({{n}} * 2))
 ```
+
+The value of `pattern` may be a const expression<sup>master</sup>.
 
 A leading `^` and trailing `$` are added to the pattern, so it must match the
 entire argument value.
@@ -3335,6 +3347,8 @@ Help strings may be added to arguments using the `[arg(ARG, help=HELP)]` attribu
 [arg("bar", help="hello")]
 foo bar:
 ```
+
+The value `help` may be a const expression<sup>master</sup>.
 
 ```console
 $ just --usage foo
@@ -3386,8 +3400,9 @@ $ just foo --bar=hello
 bar=hello
 ```
 
-The value of `long` can be omitted, in which case the option defaults to the
-name of the parameter:
+The value of `long` may be omitted, in which case the option defaults to the
+name of the parameter. With the following justfile, `bar` may be passed with
+`--bar`:
 
 ```just
 [arg("bar", long)]
@@ -3411,9 +3426,37 @@ $ just foo -b hello
 bar=hello
 ```
 
+The value of `short` may be omitted, in which case the option defaults to the
+first character of the name of the parameter. With the following justfile,
+`bar` may be passed with `-b`:
+
+```just
+[arg("bar", short)]
+foo bar:
+```
+
 If a parameter has both a long and short option, it may be passed using either.
 
-Variadic `*` and `+` parameters cannot be options.
+Multiple short options may be combined<sup>master</sup>, for example `-abc` is
+equivalent to `-a -b -c`. A short option which takes a value may appear last,
+for example `-abcd VALUE`.
+
+Variadic `*` and `+` parameters may be options, in which case the option is
+repeatable, with each occurrence contributing one value:
+
+```just
+[arg('file', long)]
+backup +file:
+  scp {{file}} me@server.com:
+```
+
+```console
+$ just backup --file FAQ.md --file GRAMMAR.md
+scp FAQ.md GRAMMAR.md me@server.com:
+```
+
+As with positional variadic parameters, `+` options must be passed at least
+once, whereas `*` options may be omitted.
 
 The `[arg(ARG, value=VALUE, …)]`<sup>1.46.0</sup> attribute can be used with
 `long` or `short` to make a parameter a flag which does not take a value.
