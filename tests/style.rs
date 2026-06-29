@@ -78,7 +78,7 @@ fn style_unknown() {
 fn style_single() {
   #[track_caller]
   fn case(name: &str, code: u8) {
-    assert_eval_eq(
+    assert_eval(
       &format!("style('{name}', 'foo')"),
       &format!("\x1b[{code}mfoo\x1b[0m"),
     );
@@ -131,7 +131,7 @@ fn style_list() {
         x := style(['bold', 'bg:blue', 'red'], 'foo')
       ",
     )
-    .env("JUST_UNSTABLE", "1")
+    .unstable()
     .args(["--evaluate", "x"])
     .stdout("\x1b[1;44;31mfoo\x1b[0m")
     .unindent_stdout(false)
@@ -148,7 +148,7 @@ fn style_last_wins() {
         x := style(['red', 'green'], 'foo')
       ",
     )
-    .env("JUST_UNSTABLE", "1")
+    .unstable()
     .args(["--evaluate", "x"])
     .stdout("\x1b[32mfoo\x1b[0m")
     .unindent_stdout(false)
@@ -159,7 +159,7 @@ fn style_last_wins() {
 fn style_fixed() {
   #[track_caller]
   fn case(name: &str, code: &str) {
-    assert_eval_eq(
+    assert_eval(
       &format!("style('{name}', 'foo')"),
       &format!("\x1b[{code}mfoo\x1b[0m"),
     );
@@ -175,7 +175,7 @@ fn style_fixed() {
 fn style_rgb() {
   #[track_caller]
   fn case(name: &str, code: &str) {
-    assert_eval_eq(
+    assert_eval(
       &format!("style('{name}', 'foo')"),
       &format!("\x1b[{code}mfoo\x1b[0m"),
     );
@@ -190,11 +190,42 @@ fn style_rgb() {
 }
 
 #[test]
+fn style_stream() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        x := style(['red', 'stdout'], 'foo')
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .args(["--color", "always", "--evaluate", "x"])
+    .stdout("\x1b[31mfoo\x1b[0m")
+    .unindent_stdout(false)
+    .success();
+
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        x := style(['red', 'stdout'], 'foo')
+      ",
+    )
+    .env("JUST_UNSTABLE", "1")
+    .args(["--color", "never", "--evaluate", "x"])
+    .stdout("foo")
+    .unindent_stdout(false)
+    .success();
+}
+
+#[test]
 fn style_prefix_without_text() {
-  assert_eval_eq("style('red')", "\x1b[31m");
+  assert_eval("style('red')", "\x1b[31m");
 }
 
 #[test]
 fn style_with_text() {
-  assert_eval_eq("style('error', 'foo')", "\x1b[1;31mfoo\x1b[0m");
+  assert_eval("style('error', 'foo')", "\x1b[1;31mfoo\x1b[0m");
 }

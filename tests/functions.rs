@@ -670,50 +670,50 @@ fn semver_matches() {
 
 #[test]
 fn trim_end_matches() {
-  assert_eval_eq("trim_end_matches('foo', 'o')", "f");
-  assert_eval_eq("trim_end_matches('fabab', 'ab')", "f");
-  assert_eval_eq("trim_end_matches('fbaabab', 'ab')", "fba");
+  assert_eval("trim_end_matches('foo', 'o')", "f");
+  assert_eval("trim_end_matches('fabab', 'ab')", "f");
+  assert_eval("trim_end_matches('fbaabab', 'ab')", "fba");
 }
 
 #[test]
 fn trim_end_match() {
-  assert_eval_eq("trim_end_match('foo', 'o')", "fo");
-  assert_eval_eq("trim_end_match('fabab', 'ab')", "fab");
+  assert_eval("trim_end_match('foo', 'o')", "fo");
+  assert_eval("trim_end_match('fabab', 'ab')", "fab");
 }
 
 #[test]
 fn trim_start_matches() {
-  assert_eval_eq("trim_start_matches('oof', 'o')", "f");
-  assert_eval_eq("trim_start_matches('ababf', 'ab')", "f");
-  assert_eval_eq("trim_start_matches('ababbaf', 'ab')", "baf");
+  assert_eval("trim_start_matches('oof', 'o')", "f");
+  assert_eval("trim_start_matches('ababf', 'ab')", "f");
+  assert_eval("trim_start_matches('ababbaf', 'ab')", "baf");
 }
 
 #[test]
 fn trim_start_match() {
-  assert_eval_eq("trim_start_match('oof', 'o')", "of");
-  assert_eval_eq("trim_start_match('ababf', 'ab')", "abf");
+  assert_eval("trim_start_match('oof', 'o')", "of");
+  assert_eval("trim_start_match('ababf', 'ab')", "abf");
 }
 
 #[test]
 fn trim_start() {
-  assert_eval_eq("trim_start('  f  ')", "f  ");
+  assert_eval("trim_start('  f  ')", "f  ");
 }
 
 #[test]
 fn trim_end() {
-  assert_eval_eq("trim_end('  f  ')", "  f");
+  assert_eval("trim_end('  f  ')", "  f");
 }
 
 #[test]
 fn append() {
-  assert_eval_eq("append('8', 'r s t')", "r8 s8 t8");
-  assert_eval_eq("append('.c', 'main sar x11')", "main.c sar.c x11.c");
-  assert_eval_eq("append('-', 'c v h y')", "c- v- h- y-");
-  assert_eval_eq(
+  assert_eval("append('8', 'r s t')", "r8 s8 t8");
+  assert_eval("append('.c', 'main sar x11')", "main.c sar.c x11.c");
+  assert_eval("append('-', 'c v h y')", "c- v- h- y-");
+  assert_eval(
     "append('0000', '11 10 01 00')",
     "110000 100000 010000 000000",
   );
-  assert_eval_eq(
+  assert_eval(
     "append('tion', '
     Determina
     Acquisi
@@ -726,17 +726,17 @@ fn append() {
 
 #[test]
 fn prepend() {
-  assert_eval_eq("prepend('8', 'r s t\n  \n  ')", "8r 8s 8t");
-  assert_eval_eq(
+  assert_eval("prepend('8', 'r s t\n  \n  ')", "8r 8s 8t");
+  assert_eval(
     "prepend('src/', 'main sar x11')",
     "src/main src/sar src/x11",
   );
-  assert_eval_eq("prepend('-', 'c\tv h\ny')", "-c -v -h -y");
-  assert_eval_eq(
+  assert_eval("prepend('-', 'c\tv h\ny')", "-c -v -h -y");
+  assert_eval(
     "prepend('0000', '11 10 01 00')",
     "000011 000010 000001 000000",
   );
-  assert_eval_eq(
+  assert_eval(
     "prepend('April-', '
       1st,
         17th,
@@ -748,12 +748,12 @@ fn prepend() {
 
 #[test]
 fn show_string() {
-  assert_list_eq(r#""foo""#, r#""foo""#);
+  assert_list(r#""foo""#, r#""foo""#);
 }
 
 #[test]
 fn show_escapes_contents() {
-  assert_list_eq(r#""a\tb\"c""#, r#""a\tb\"c""#);
+  assert_list(r#""a\tb\"c""#, r#""a\tb\"c""#);
 }
 
 #[test]
@@ -775,34 +775,15 @@ fn show_requires_lists_setting() {
 
 #[test]
 fn show_list() {
-  Test::new()
-    .justfile(
-      r#"
-        set lists
-
-        x := show(["foo", "bar baz", "qux"])
-      "#,
-    )
-    .env("JUST_UNSTABLE", "1")
-    .args(["--evaluate", "x"])
-    .stdout(r#"["foo", "bar baz", "qux"]"#)
-    .success();
+  assert_list(
+    r#"["foo", "bar baz", "qux"]"#,
+    r#"["foo", "bar baz", "qux"]"#,
+  );
 }
 
 #[test]
 fn show_empty_list() {
-  Test::new()
-    .justfile(
-      r"
-        set lists
-
-        x := show([])
-      ",
-    )
-    .env("JUST_UNSTABLE", "1")
-    .args(["--evaluate", "x"])
-    .stdout("[]")
-    .success();
+  assert_list("[]", "[]");
 }
 
 #[test]
@@ -810,10 +791,10 @@ fn join_unix() {
   if cfg!(windows) {
     return;
   }
-  assert_eval_eq("join('a', 'b', 'c', 'd')", "a/b/c/d");
-  assert_eval_eq("join('a', '/b', 'c', 'd')", "/b/c/d");
-  assert_eval_eq("join('a', '/b', '/c', 'd')", "/c/d");
-  assert_eval_eq("join('a', '/b', '/c', '/d')", "/d");
+  assert_eval("join('a', 'b', 'c', 'd')", "a/b/c/d");
+  assert_eval("join('a', '/b', 'c', 'd')", "/b/c/d");
+  assert_eval("join('a', '/b', '/c', 'd')", "/c/d");
+  assert_eval("join('a', '/b', '/c', '/d')", "/d");
 }
 
 #[test]
@@ -821,10 +802,10 @@ fn join_windows() {
   if cfg!(not(windows)) {
     return;
   }
-  assert_eval_eq("join('a', 'b', 'c', 'd')", "a\\b\\c\\d");
-  assert_eval_eq("join('a', '\\b', 'c', 'd')", "\\b\\c\\d");
-  assert_eval_eq("join('a', '\\b', '\\c', 'd')", "\\c\\d");
-  assert_eval_eq("join('a', '\\b', '\\c', '\\d')", "\\d");
+  assert_eval("join('a', 'b', 'c', 'd')", "a\\b\\c\\d");
+  assert_eval("join('a', '\\b', 'c', 'd')", "\\b\\c\\d");
+  assert_eval("join('a', '\\b', '\\c', 'd')", "\\c\\d");
+  assert_eval("join('a', '\\b', '\\c', '\\d')", "\\d");
 }
 
 #[test]
@@ -856,11 +837,7 @@ fn test_path_exists_filepath_exist() {
 
 #[test]
 fn test_path_exists_filepath_doesnt_exist() {
-  Test::new()
-    .justfile("x := path_exists('testfile')")
-    .args(["--evaluate", "x"])
-    .stdout("false")
-    .success();
+  assert_eval("path_exists('testfile')", "false");
 }
 
 #[test]
@@ -1011,11 +988,10 @@ fn choose_bad_length() {
 
 #[test]
 fn sha256() {
-  Test::new()
-    .justfile("x := sha256('5943ee37-0000-1000-8000-010203040506')")
-    .args(["--evaluate", "x"])
-    .stdout("2330d7f5eb94a820b54fed59a8eced236f80b633a504289c030b6a65aef58871")
-    .success();
+  assert_eval(
+    "sha256('5943ee37-0000-1000-8000-010203040506')",
+    "2330d7f5eb94a820b54fed59a8eced236f80b633a504289c030b6a65aef58871",
+  );
 }
 
 #[test]
@@ -1041,6 +1017,11 @@ fn just_pid() {
 }
 
 #[test]
+fn just_version() {
+  assert_eval("just_version()", env!("CARGO_PKG_VERSION"));
+}
+
+#[test]
 fn shell_no_argument() {
   Test::new()
     .justfile("var := shell()")
@@ -1059,17 +1040,17 @@ fn shell_no_argument() {
 
 #[test]
 fn shell_minimal() {
-  assert_eval_eq("shell('echo $1 $2', 'justice', 'legs')", "justice legs");
+  assert_eval("shell('echo $1 $2', 'justice', 'legs')", "justice legs");
 }
 
 #[test]
 fn shell_args() {
-  assert_eval_eq("shell('echo $@', 'justice', 'legs')", "justice legs");
+  assert_eval("shell('echo $@', 'justice', 'legs')", "justice legs");
 }
 
 #[test]
 fn shell_first_arg() {
-  assert_eval_eq("shell('echo $0')", "echo $0");
+  assert_eval("shell('echo $0')", "echo $0");
 }
 
 #[test]
@@ -1091,11 +1072,10 @@ fn shell_error() {
 
 #[test]
 fn blake3() {
-  Test::new()
-    .justfile("x := blake3('5943ee37-0000-1000-8000-010203040506')")
-    .args(["--evaluate", "x"])
-    .stdout("026c9f740a793ff536ddf05f8915ea4179421f47f0fa9545476076e9ba8f3f2b")
-    .success();
+  assert_eval(
+    "blake3('5943ee37-0000-1000-8000-010203040506')",
+    "026c9f740a793ff536ddf05f8915ea4179421f47f0fa9545476076e9ba8f3f2b",
+  );
 }
 
 #[test]
@@ -1122,11 +1102,10 @@ fn canonicalize() {
 
 #[test]
 fn encode_uri_component() {
-  Test::new()
-    .justfile("x := encode_uri_component(\"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\\\"#$%&'()*+,-./:;<=>?@[\\\\]^_`{|}~ \\t\\r\\n🌐\")")
-    .args(["--evaluate", "x"])
-    .stdout("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!%22%23%24%25%26'()*%2B%2C-.%2F%3A%3B%3C%3D%3E%3F%40%5B%5C%5D%5E_%60%7B%7C%7D~%20%09%0D%0A%F0%9F%8C%90")
-    .success();
+  assert_eval(
+    "encode_uri_component(\"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\\\"#$%&'()*+,-./:;<=>?@[\\\\]^_`{|}~ \\t\\r\\n🌐\")",
+    "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!%22%23%24%25%26'()*%2B%2C-.%2F%3A%3B%3C%3D%3E%3F%40%5B%5C%5D%5E_%60%7B%7C%7D~%20%09%0D%0A%F0%9F%8C%90",
+  );
 }
 
 #[test]
@@ -1585,11 +1564,7 @@ fn shell_with_powershell() {
 
 #[test]
 fn module_path() {
-  Test::new()
-    .justfile("foo := module_path()")
-    .args(["--evaluate", "foo"])
-    .stdout("")
-    .success();
+  assert_eval("module_path()", "");
 }
 
 #[test]

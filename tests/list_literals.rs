@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn list_literals_are_lists() {
-  assert_list_eq(r#"["a", "b"]"#, r#"["a", "b"]"#);
+  assert_list(r#"["a", "b"]"#, r#"["a", "b"]"#);
 }
 
 #[test]
@@ -16,7 +16,7 @@ fn empty_list_literal_is_falsy() {
           @echo {{ [] || "fallback" }}
       "#,
     )
-    .env("JUST_UNSTABLE", "1")
+    .unstable()
     .arg("foo")
     .stdout("fallback\n")
     .success();
@@ -24,7 +24,7 @@ fn empty_list_literal_is_falsy() {
 
 #[test]
 fn list_literals_flatten_elements() {
-  assert_list_eq(
+  assert_list(
     r#"["pre", ["x", "y"], "post"]"#,
     r#"["pre", "x", "y", "post"]"#,
   );
@@ -32,7 +32,7 @@ fn list_literals_flatten_elements() {
 
 #[test]
 fn list_literals_may_have_trailing_comma() {
-  assert_list_eq(r#"["a", "b",]"#, r#"["a", "b"]"#);
+  assert_list(r#"["a", "b",]"#, r#"["a", "b"]"#);
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn list_literals_requires_lists_setting() {
           @echo hi
       ",
     )
-    .env("JUST_UNSTABLE", "1")
+    .unstable()
     .arg("foo")
     .stderr(
       "
@@ -75,7 +75,7 @@ fn list_literals_round_trip_through_dump() {
           @echo "{{ quote(x) }}"
       "#,
     )
-    .env("JUST_UNSTABLE", "1")
+    .unstable()
     .arg("--dump")
     .stdout(
       r#"

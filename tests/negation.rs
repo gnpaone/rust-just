@@ -2,12 +2,12 @@ use super::*;
 
 #[test]
 fn negates_truthy_value() {
-  assert_list_eq("!'foo'", FALSE);
+  assert_list("!'foo'", FALSE);
 }
 
 #[test]
 fn negates_empty_list() {
-  assert_list_eq("![]", TRUE);
+  assert_list("![]", TRUE);
 }
 
 #[test]
@@ -21,7 +21,7 @@ fn requires_lists_setting() {
           @echo hi
       ",
     )
-    .env("JUST_UNSTABLE", "1")
+    .unstable()
     .arg("foo")
     .stderr(
       "
