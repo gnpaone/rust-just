@@ -98,6 +98,7 @@ pub(crate) fn get(name: &str) -> Option<Function> {
     "join_list" => BinaryOptValueStrToValue(join_list),
     "just_executable" => Nullary(just_executable),
     "just_pid" => Nullary(just_pid),
+    "just_version" => Nullary(just_version),
     "justfile" => Nullary(justfile),
     "justfile_directory" => Nullary(justfile_directory),
     "kebabcase" => Unary(kebabcase),
@@ -468,6 +469,10 @@ fn just_pid(_context: Context) -> StringResult {
   Ok(std::process::id().to_string())
 }
 
+fn just_version(_context: Context) -> StringResult {
+  Ok(VERSION.into())
+}
+
 fn justfile(context: Context) -> StringResult {
   context
     .execution_context
@@ -726,7 +731,10 @@ fn style(context: Context, styles: &Value, text: Option<&str>) -> StringResult {
     }
   }
 
+  let config = context.execution_context.config;
+
   let mut style = Style::new();
+  let mut active = true;
 
   for token in styles {
     let error = || format!("invalid style: `{token}`");
@@ -774,9 +782,12 @@ fn style(context: Context, styles: &Value, text: Option<&str>) -> StringResult {
         "reverse" => style.reverse(),
         "strikethrough" => style.strikethrough(),
         "underline" => style.underline(),
+        // streams
+        "stdout" => active = config.color.stdout().active(),
+        "stderr" => active = config.color.stderr().active(),
         // roles
         "command" => {
-          if let Some(color) = context.execution_context.config.command_color {
+          if let Some(color) = config.command_color {
             style.fg(color);
           }
           style.bold();
@@ -794,9 +805,16 @@ fn style(context: Context, styles: &Value, text: Option<&str>) -> StringResult {
     }
   }
 
-  Ok(match text {
-    Some(text) => style.paint(text),
-    None => style.prefix(),
+  Ok(if active {
+    match text {
+      Some(text) => style.paint(text),
+      None => style.prefix(),
+    }
+  } else {
+    match text {
+      Some(text) => text.into(),
+      None => String::new(),
+    }
   })
 }
 
