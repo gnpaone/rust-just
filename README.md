@@ -519,11 +519,11 @@ value other than `false`, `0`, or the empty string.
 ### Requiring a Minimum Just Version
 
 If you use features of `just` which require a particular version, you may use
-the `minimum-version`<sup>master</sup> setting to make it an error to use older
+the `minimum-version`<sup>1.55.0</sup> setting to make it an error to use older
 versions of `just`:
 
 ```justfile
-set minimum-version := <sup>master</sup>
+set minimum-version := '1.55.0'
 ```
 
 If `just` encounters a minimum version greater than its own version, it will
@@ -973,7 +973,7 @@ double n:
   echo $(({{n}} * 2))
 ```
 
-The value of `pattern` may be a const expression<sup>master</sup>.
+The value of `pattern` may be a const expression<sup>1.55.0</sup>.
 
 A leading `^` and trailing `$` are added to the pattern, so it must match the
 entire argument value.
@@ -1010,7 +1010,7 @@ Help strings may be added to arguments using the `[arg(ARG, help=HELP)]` attribu
 foo bar:
 ```
 
-The value `help` may be a const expression<sup>master</sup>.
+The value `help` may be a const expression<sup>1.55.0</sup>.
 
 ```console
 $ just --usage foo
@@ -1099,7 +1099,7 @@ foo bar:
 
 If a parameter has both a long and short option, it may be passed using either.
 
-Multiple short options may be combined<sup>master</sup>, for example `-abc` is
+Multiple short options may be combined<sup>1.55.0</sup>, for example `-abc` is
 equivalent to `-a -b -c`. A short option which takes a value may appear last,
 for example `-abcd VALUE`.
 
@@ -1623,7 +1623,7 @@ mod foo
 alias baz := foo::bar
 ```
 
-Or a module<sup>master</sup>:
+Or a module<sup>1.55.0</sup>:
 
 ```justfile
 mod frontend
@@ -2126,7 +2126,7 @@ lengths is an error.
 
 The `++` operator performs list concatenation.
 
-##### Booleans
+#### Booleans
 
 The canonical boolean true value is the string `"true"`, and the canonical
 boolean false value is the empty list `[]`. All values other than the empty
@@ -2147,7 +2147,7 @@ just in `if` and `assert()`, and evaluate to `"true"` or `[]`.
 Values may be negated with `!`. `!expression` evaluates to `"true"` if
 `expression` is `[]`, otherwise it evaluates to `[]`.
 
-##### Settings
+#### Settings
 
 The `script-interpreter`, `shell`, and `windows-shell` settings flatten their
 elements like list literals.
@@ -2169,7 +2169,7 @@ Each element of the value of `set dotenv-command` is run as a command, with
 variables from commands later in the list taking precedence over variables from
 commands earlier in the list.
 
-##### Attributes
+#### Attributes
 
 The `[arg(flag)]` attribute makes the parameter a flag which does not take a
 value on the command line. For example, with `[arg('foo', long, flag)]`, `foo`
@@ -2194,7 +2194,7 @@ any argument is accepted. For example, with
 In `[env(variable, value)]` if `value` is `[]`, `variable` is not set.
 Otherwise it is set to `value` joined with spaces.
 
-##### Functions
+#### Functions
 
 - `absolute_path()` - Applies to each list element individually.
 - `append()` - Applies to each list element individually and does not split
@@ -2224,7 +2224,7 @@ Otherwise it is set to `value` joined with spaces.
   with leading and trailing whitespace trimmed.
 - `which()` - Returns the empty list when no executable is found.
 
-##### Examples
+#### Examples
 
 Each list element is `quote()`'ed separately:
 
@@ -3075,7 +3075,7 @@ foo:
 `just` passes the command to be executed as an argument. Many shells will need
 an additional flag, often `-c`, to make them evaluate the first argument.
 
-##### Windows Shell
+#### Windows Shell
 
 `just` uses `sh` on Windows by default. To use a different shell on Windows,
 use `windows-shell`:
@@ -3091,7 +3091,7 @@ See
 [powershell.just](https://github.com/casey/just/blob/master/examples/powershell.just)
 for a justfile that uses PowerShell on all platforms.
 
-##### Windows PowerShell
+#### Windows PowerShell
 
 *`set windows-powershell` uses the legacy `powershell.exe` binary, and is no
 longer recommended. See the `windows-shell` setting above for a more flexible
@@ -3107,31 +3107,31 @@ hello:
   Write-Host "Hello, world!"
 ```
 
-##### Python 3
+#### Python 3
 
 ```just
 set shell := ["python3", "-c"]
 ```
 
-##### Bash
+#### Bash
 
 ```just
 set shell := ["bash", "-uc"]
 ```
 
-##### Z Shell
+#### Z Shell
 
 ```just
 set shell := ["zsh", "-uc"]
 ```
 
-##### Fish
+#### Fish
 
 ```just
 set shell := ["fish", "-c"]
 ```
 
-##### Nushell
+#### Nushell
 
 ```just
 set shell := ["nu", "-c"]
@@ -4490,10 +4490,43 @@ attribute<sup>1.54.0</sup> if it finds an entry matching the invocation in the
 cache. The `[cache]` attribute may only be used with script recipes and is
 currently unstable.
 
+For example, this recipe will be skipped if `image.jpg` exists and the contents
+of `image.png` and the output of `convert -version` haven't changed since the
+last run:
+
+```just
+set unstable
+
+[script]
+[cache(inputs = "image.png", outputs = "image.jpg", extra = `convert -version`)]
+convert:
+  convert image.png image.jpg
+```
+
 Unlike many other features of `just`, which are, hopefully, well thought-out
 and user-friendly, cached recipes are inherently fragile. It is important to
 understand their limitations before relying on them. Please read this section
 thoroughly, including the friendly admonitions below.
+
+### Friendly Admonitions
+
+`just` will happily skip cached recipes, but it is your responsibility to make
+sure that this is safe, and that the contents of the cache key capture enough
+information about recipe invocations for caching to make sense in the first
+place.
+
+In particular, there are many details about the context in which a recipe runs
+that are not captured by cache keys.
+
+These include the time, input files, output files, system binaries, operating
+system version, databases, systems over the network, the DNS, and any of the
+myriad other things which may change the execution of a computer program.
+
+Attempting to skip execution based on the type of crude heuristics that `just`
+employs has a long and sordid history. However, it is an undeniably convenient
+and powerful tool, and it is provided in the hopes that you find it useful.
+
+### Implementation
 
 The cache is a directory named `.justcache` alongside the `justfile` and should
 not be committed to version control systems. It contains cache entries named
@@ -4510,6 +4543,8 @@ The keys of the cache key object are:
 - `positional`: positional arguments
 - `recipe`: `::`-separated module path to invoked recipe
 - `working_directory`: current working directory
+
+All keys other than `extra` and `inputs` are populated automatically.
 
 Cache key objects for invoked recipes can be printed to standard error with
 `just -vv`.
@@ -4535,7 +4570,7 @@ and skip the invocation.
 
 The cache can be bypassed entirely with the `--no-cache` flag.
 
-#### Clearing the Cache
+### Clearing the Cache
 
 The recipe cache is stored in a directory named `.justcache` alongside the
 `justfile`. Deleting it will clear the cache.
@@ -4563,7 +4598,7 @@ just --clean bar bob
 just --clean bar::bob
 ```
 
-#### Input Files
+### Input Files
 
 Input files can be provided with `[cache(inputs = FILES)]`, where `FILES` is an
 expression that is evaluated with recipe arguments in scope and whose evaluated
@@ -4590,7 +4625,7 @@ build:
   cc lib.c main.c -o main
 ```
 
-#### Output Files
+### Output Files
 
 Output files can be provided with `[cache(outputs = FILES)]`, where `FILES` is
 an expression that is evaluated with recipe arguments in scope and whose
@@ -4620,24 +4655,6 @@ clean:
 
 This forces `build` to re-run if `main` is deleted by `clean`.
 
-#### Friendly Admonitions
-
-`just` will happily skip cached recipes, but it is your responsibility to make
-sure that this is safe, and that the contents of the cache key capture enough
-information about recipe invocations for caching to make sense in the first
-place.
-
-In particular, there are many details about the context in which a recipe runs
-that are not captured by cache keys.
-
-These include the time, input files, output files, system binaries, operating
-system version, databases, systems over the network, the DNS, and any of the
-myriad other things which may change the execution of a computer program.
-
-Attempting to skip execution based on the type of crude heuristics that `just`
-employs has a long and sordid history. However, it is an undeniably convenient
-and powerful tool, and it is provided in the hopes that you find it useful.
-
 Reference
 ---------
 
@@ -4648,10 +4665,10 @@ change their behavior.
 
 | Name | Type | Description |
 |------|------|-------------|
-| `[arg(ARG, help="HELP")]`<sup>1.46.0</sup> | recipe | Print help string `HELP` for `ARG` in usage messages. May be a const expression<sup>master</sup>. |
-| `[arg(ARG, long="LONG")]`<sup>1.46.0</sup> | recipe | Require values of argument `ARG` to be passed as `--LONG` option. If the parameter is variadic, the option is repeatable<sup>master</sup>. |
-| `[arg(ARG, pattern="PATTERN")]`<sup>1.45.0</sup> | recipe | Require values of argument `ARG` to match regular expression `PATTERN`. May be a const expression<sup>master</sup>. |
-| `[arg(ARG, short="S")]`<sup>1.46.0</sup> | recipe | Require values of argument `ARG` to be passed as short `-S` option. If the parameter is variadic, the option is repeatable<sup>master</sup>. |
+| `[arg(ARG, help="HELP")]`<sup>1.46.0</sup> | recipe | Print help string `HELP` for `ARG` in usage messages. May be a const expression<sup>1.55.0</sup>. |
+| `[arg(ARG, long="LONG")]`<sup>1.46.0</sup> | recipe | Require values of argument `ARG` to be passed as `--LONG` option. If the parameter is variadic, the option is repeatable<sup1.55.0master</sup>. |
+| `[arg(ARG, pattern="PATTERN")]`<sup>1.45.0</sup> | recipe | Require values of argument `ARG` to match regular expression `PATTERN`. May be a const expression<sup>1.55.0</sup>. |
+| `[arg(ARG, short="S")]`<sup>1.46.0</sup> | recipe | Require values of argument `ARG` to be passed as short `-S` option. If the parameter is variadic, the option is repeatable<sup>1.55.0</sup>. |
 | `[arg(ARG, value=VALUE)]`<sup>1.46.0</sup> | recipe | Makes option `ARG` a flag which does not take a value. |
 | `[cache]`<sup>1.54.0</sup> | recipe | Skip recipe invocations when a matching entry exists in the cache. See [cached recipes](#cached-recipes) for details. Currently unstable. |
 | `[confirm(PROMPT)]`<sup>1.23.0</sup> | recipe | Require confirmation prior to executing recipe with a custom prompt. |
@@ -4743,7 +4760,7 @@ foo:
 | `ignore-comments` | boolean | `false` | Ignore recipe lines beginning with `#`. |
 | `lazy`<sup>1.47.0</sup> | boolean | `false` | Don't evaluate unused variables. |
 | `lists`<sup>1.53.0</sup> | boolean | `false` | Values may be lists of strings instead of strings. Currently unstable. |
-| `minimum-version`<sup>master</sup> | string | - | Error if `just` is older than `minimum-version`. Accepts a string of the form `MAJOR.MINOR.PATCH`, e.g., `"1.55.0"`. |
+| `minimum-version`<sup>1.55.0</sup> | string | - | Error if `just` is older than `minimum-version`. Accepts a string of the form `MAJOR.MINOR.PATCH`, e.g., `"1.55.0"`. |
 | `no-cd`<sup>1.51.0</sup> | boolean | `false` | Don't change directory when executing recipes by recipe attribute. |
 | `no-exit-message`<sup>1.39.0</sup> | boolean | `false` | Don't print exit messages if recipes fail. |
 | `positional-arguments` | boolean | `false` | Pass positional arguments. |
@@ -4990,7 +5007,7 @@ within a submodule.
 
 - `just_executable()` - Absolute path to the `just` executable.
 - `just_pid()` - Process ID of the `just` executable.
-- `just_version()`<sup>master</sup> - Version of the `just` executable.
+- `just_version()`<sup>1.55.0</sup> - Version of the `just` executable.
 
 For example:
 
@@ -5151,7 +5168,7 @@ for details.
   - `error`: errors
   - `warning`: warnings
 
-  Additional styles supported by <sup>master</sup> and later include
+  Additional styles supported by <sup>1.55.0</sup> and later include
   named colors:
 
   - `black`
@@ -5180,7 +5197,7 @@ for details.
   - `strikethrough`
   - `underline`
 
-  Two stream names<sup>master</sup> gate the style on whether `just` would
+  Two stream names<sup>1.55.0</sup> gate the style on whether `just` would
   color the output stream, determined by `--color`, `JUST_COLOR`, and whether
   the stream is connected to a terminal:
 
@@ -5202,7 +5219,7 @@ for details.
     echo '{{style("error") + message + NORMAL}}'
   ```
 
-- `style(styles, text)`<sup>master</sup> Style `text` with `styles` as in the
+- `style(styles, text)`<sup>1.55.0</sup> Style `text` with `styles` as in the
   one-argument form. The style is reset automatically, so use of `NORMAL` to
   reset the terminal is not needed:
 
