@@ -1185,6 +1185,20 @@ fn doc_attribute_suppresses_comment() {
 }
 
 #[test]
+fn doc_attribute_expression() {
+  assert_dump(
+    "
+        [doc('f' + 'oo')]
+        foo:
+      ",
+    "
+        [doc('f' + 'oo')]
+        foo:
+      ",
+  );
+}
+
+#[test]
 fn unchanged_justfiles_are_not_written_to_disk() {
   let tmp = tempdir();
 
@@ -1226,6 +1240,26 @@ fn private_variable() {
 }
 
 #[test]
+fn private_alias() {
+  assert_dump(
+    "
+        [private]
+        alias f := foo
+
+        foo:
+            echo foo
+      ",
+    "
+        [private]
+        alias f := foo
+
+        foo:
+            echo foo
+      ",
+  );
+}
+
+#[test]
 fn module_groups_are_preserved() {
   Test::new()
     .justfile(
@@ -1239,10 +1273,30 @@ fn module_groups_are_preserved() {
     .arg("--dump")
     .stdout(
       r#"
-        [group: 'bar']
-        [group: "baz"]
+        [group('bar')]
+        [group("baz")]
         mod foo
       "#,
+    )
+    .success();
+}
+
+#[test]
+fn module_private_is_preserved() {
+  Test::new()
+    .justfile(
+      "
+        [private]
+        mod foo
+      ",
+    )
+    .write("foo.just", "")
+    .arg("--dump")
+    .stdout(
+      "
+        [private]
+        mod foo
+      ",
     )
     .success();
 }

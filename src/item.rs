@@ -1,7 +1,10 @@
 use super::*;
 
 /// A single top-level item
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, EnumDiscriminants)]
+#[strum_discriminants(name(ItemKind))]
+#[strum_discriminants(derive(IntoStaticStr))]
+#[strum_discriminants(strum(serialize_all = "kebab-case"))]
 pub(crate) enum Item<'src> {
   Alias(Alias<'src, Namepath<'src>>),
   Assignment(Assignment<'src>),
@@ -9,28 +12,81 @@ pub(crate) enum Item<'src> {
   Function(FunctionDefinition<'src>),
   Import {
     absolute: Option<PathBuf>,
+    attributes: AttributeSet<'src>,
     optional: bool,
     relative: StringLiteral<'src>,
   },
   Module {
     absolute: Option<PathBuf>,
+    attributes: AttributeSet<'src>,
     doc: Option<String>,
-    groups: Vec<StringLiteral<'src>>,
     name: Name<'src>,
     optional: bool,
-    private: bool,
     relative: Option<StringLiteral<'src>>,
   },
   Newline,
   Recipe(UnresolvedRecipe<'src>),
-  Set(Set<'src>),
+  Setting(Set<'src>),
   Unexport {
+    attributes: AttributeSet<'src>,
     name: Name<'src>,
   },
 }
 
+impl<'src> Item<'src> {
+  fn attributes(&self) -> Option<&AttributeSet<'src>> {
+    match self {
+      Self::Alias(alias) => Some(&alias.attributes),
+      Self::Assignment(assignment) => Some(&assignment.attributes),
+      Self::Comment(_) | Self::Newline => None,
+      Self::Function(function) => Some(&function.attributes),
+      Self::Import { attributes, .. }
+      | Self::Module { attributes, .. }
+      | Self::Unexport { attributes, .. } => Some(attributes),
+      Self::Recipe(recipe) => Some(&recipe.attributes),
+      Self::Setting(set) => Some(&set.attributes),
+    }
+  }
+
+  pub(crate) fn is_enabled(&self) -> bool {
+    self.attributes().is_none_or(AttributeSet::is_enabled)
+  }
+
+  fn doc_comment(&self) -> Option<&str> {
+    match self {
+      Self::Module {
+        attributes, doc, ..
+      } => {
+        if attributes.contains(AttributeKind::Doc) {
+          None
+        } else {
+          doc.as_deref()
+        }
+      }
+      Self::Recipe(recipe) => {
+        if recipe.attributes.contains(AttributeKind::Doc) {
+          None
+        } else {
+          recipe.doc.as_deref()
+        }
+      }
+      _ => None,
+    }
+  }
+}
+
 impl ColorDisplay for Item<'_> {
   fn fmt(&self, f: &mut Formatter, color: Color) -> fmt::Result {
+    if let Some(doc) = self.doc_comment() {
+      writeln!(f, "# {doc}")?;
+    }
+
+    if let Some(attributes) = self.attributes() {
+      for attribute in attributes {
+        writeln!(f, "[{attribute}]")?;
+      }
+    }
+
     match self {
       Self::Alias(alias) => write!(f, "{alias}"),
       Self::Assignment(assignment) => write!(f, "{assignment}"),
@@ -57,21 +113,11 @@ impl ColorDisplay for Item<'_> {
         write!(f, " {relative}")
       }
       Self::Module {
-        doc,
-        groups,
         name,
         optional,
         relative,
         ..
       } => {
-        if let Some(doc) = doc {
-          writeln!(f, "# {doc}")?;
-        }
-
-        for group in groups {
-          writeln!(f, "[group: {group}]")?;
-        }
-
         write!(f, "mod")?;
 
         if *optional {
@@ -88,8 +134,32 @@ impl ColorDisplay for Item<'_> {
       }
       Self::Newline => Ok(()),
       Self::Recipe(recipe) => write!(f, "{}", recipe.color_display(color)),
-      Self::Set(set) => write!(f, "{set}"),
-      Self::Unexport { name } => write!(f, "unexport {name}"),
+      Self::Setting(set) => write!(f, "{set}"),
+      Self::Unexport { name, .. } => write!(f, "unexport {name}"),
     }
+  }
+}
+
+impl ItemKind {
+  pub(crate) fn article(self) -> &'static str {
+    match self {
+      Self::Alias | Self::Assignment | Self::Import | Self::Unexport => "an",
+      Self::Comment
+      | Self::Function
+      | Self::Module
+      | Self::Newline
+      | Self::Recipe
+      | Self::Setting => "a",
+    }
+  }
+
+  fn name(self) -> &'static str {
+    self.into()
+  }
+}
+
+impl Display for ItemKind {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    write!(f, "{}", self.name())
   }
 }

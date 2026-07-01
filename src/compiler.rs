@@ -27,6 +27,10 @@ impl Compiler {
       paths.insert(current.path.clone(), relative.into());
 
       for item in &mut ast.items {
+        if !item.is_enabled() {
+          continue;
+        }
+
         match item {
           Item::Module {
             absolute,
@@ -61,6 +65,7 @@ impl Compiler {
             relative,
             absolute,
             optional,
+            ..
           } => {
             let import = current
               .path
