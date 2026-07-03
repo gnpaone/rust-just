@@ -59,6 +59,8 @@ struct Parameter<'a> {
   help: Option<&'a str>,
   kind: &'a str,
   long: Option<&'a str>,
+  max: Option<u64>,
+  min: Option<u64>,
   name: &'a str,
   pattern: Option<Vec<&'a str>>,
   short: Option<char>,
@@ -1291,6 +1293,8 @@ fn arg_pattern() {
             "arg": {
               "help": null,
               "long": null,
+              "max": null,
+              "min": null,
               "name": "bar",
               "pattern": ["BAR"],
               "short": null,
@@ -1329,6 +1333,8 @@ fn arg_long() {
             "arg": {
               "help": null,
               "long": "BAR",
+              "max": null,
+              "min": null,
               "name": "bar",
               "pattern": null,
               "short": null,
@@ -1367,6 +1373,8 @@ fn arg_short() {
             "arg": {
               "help": null,
               "long": null,
+              "max": null,
+              "min": null,
               "name": "bar",
               "pattern": null,
               "short": "B",
@@ -1405,6 +1413,8 @@ fn arg_value() {
             "arg": {
               "help": null,
               "long": null,
+              "max": null,
+              "min": null,
               "name": "bar",
               "pattern": null,
               "short": "B",
@@ -1444,6 +1454,8 @@ fn arg_flag() {
             "arg": {
               "help": null,
               "long": "bar",
+              "max": null,
+              "min": null,
               "name": "bar",
               "pattern": null,
               "short": null,
@@ -1488,6 +1500,8 @@ fn arg_help() {
             "arg": {
               "help": "hello",
               "long": null,
+              "max": null,
+              "min": null,
               "name": "bar",
               "pattern": null,
               "short": null,

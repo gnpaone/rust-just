@@ -2,8 +2,24 @@ use super::*;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum CompileErrorKind<'src> {
+  ArgAttributeMinExceedsMax {
+    min: u64,
+    max: u64,
+  },
+  ArgAttributeRequiresMultipleOrVariadic {
+    key: Name<'src>,
+  },
   ArgAttributeRequiresOption {
-    key: &'src str,
+    key: Name<'src>,
+  },
+  ArgumentCountParse {
+    key: Name<'src>,
+    value: String,
+    source: ParseIntError,
+  },
+  ArgumentCountValue {
+    key: Name<'src>,
+    value: String,
   },
   ArgumentPatternRegex {
     source: regex::Error,
@@ -15,13 +31,13 @@ pub(crate) enum CompileErrorKind<'src> {
     max: usize,
   },
   AttributeArgumentExpression {
-    attribute: &'src str,
+    attribute: Name<'src>,
   },
   AttributeKeyMissingValue {
     key: Name<'src>,
   },
   AttributeKeyTakesNoValue {
-    key: &'src str,
+    key: Name<'src>,
   },
   AttributePositionalFollowsKeyword,
   BacktickShebang,
@@ -45,7 +61,7 @@ pub(crate) enum CompileErrorKind<'src> {
     first: usize,
   },
   DuplicateAttribute {
-    attribute: &'src str,
+    attribute: Name<'src>,
     first: usize,
   },
   DuplicateAttributeKey {
