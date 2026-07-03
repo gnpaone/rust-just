@@ -31,11 +31,26 @@ impl Display for CompileError<'_> {
     use CompileErrorKind::*;
 
     match &*self.kind {
+      ArgAttributeMinExceedsMax { min, max } => {
+        write!(f, "argument attribute `min` `{min}` exceeds `max` `{max}`")
+      }
+      ArgAttributeRequiresMultipleOrVariadic { key } => {
+        write!(
+          f,
+          "argument attribute `{key}` only valid with `multiple` or a variadic parameter"
+        )
+      }
       ArgAttributeRequiresOption { key } => {
         write!(
           f,
           "argument attribute `{key}` only valid with `long` or `short`"
         )
+      }
+      ArgumentCountParse { key, value, source } => {
+        write!(f, "invalid `{key}` value `{value}`: {source}")
+      }
+      ArgumentCountValue { key, value } => {
+        write!(f, "invalid `{key}` value `{value}`")
       }
       ArgumentPatternRegex { .. } => {
         write!(f, "failed to parse argument pattern")

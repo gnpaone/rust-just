@@ -210,6 +210,10 @@ impl<'src: 'run, 'run> InvocationParser<'src, 'run> {
         continue;
       }
 
+      if !group.is_empty() {
+        parameter.check_value_count(recipe, group)?;
+      }
+
       for element in group {
         parameter.check_pattern_match(recipe, element)?;
       }

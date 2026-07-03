@@ -1249,3 +1249,37 @@ fn multiple_takes_no_value() {
     )
     .failure();
 }
+
+#[test]
+fn multiple_option_exceeding_max_is_an_error() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        [arg('bar', long, multiple, max='2')]
+        foo bar:
+      ",
+    )
+    .unstable()
+    .args(["foo", "--bar", "a", "--bar", "b", "--bar", "c"])
+    .stderr("error: recipe `foo` parameter `bar` got 3 values but takes at most 2\n")
+    .failure();
+}
+
+#[test]
+fn multiple_option_below_min_is_an_error() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        [arg('bar', long, multiple, min='2')]
+        foo bar:
+      ",
+    )
+    .unstable()
+    .args(["foo", "--bar", "a"])
+    .stderr("error: recipe `foo` parameter `bar` got 1 value but takes at least 2\n")
+    .failure();
+}
