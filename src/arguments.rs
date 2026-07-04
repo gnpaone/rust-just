@@ -186,12 +186,18 @@ pub struct Arguments {
   )]
   pub(crate) highlight: bool,
   #[arg(
-    default_value = "    ",
     env = "JUST_INDENTATION",
     help = "Indent recipes bodies with <INDENTATION>",
     long
   )]
-  pub(crate) indentation: Indentation,
+  pub(crate) indentation: Option<Indentation>,
+  #[arg(
+    env = "JUST_JOBS",
+    help = "Run at most <N> recipes simultaneously with the [parallel] attribute",
+    long,
+    value_name = "N"
+  )]
+  pub(crate) jobs: Option<NonZeroU64>,
   #[arg(
     add = ArgValueCompleter::new(PathCompleter::file()),
     env = "JUST_JUSTFILE",
