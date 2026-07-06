@@ -1494,7 +1494,8 @@ baz:
 ```
 
 The number of simultaneously running recipes may be limited with the `--jobs`
-option<sup>master</sup>.
+option<sup>master</sup>. The `num_jobs()` function returns the number of jobs,
+falling back to the empty list if `--jobs` was not passed.
 
 GNU `parallel` may be used to run recipe lines concurrently:
 
@@ -2856,7 +2857,8 @@ Here's a justfile with a recipe indented with spaces, represented as `·`, and
 tabs, represented as `→`.
 
 ```justfile
-set windows-shell := ["pwsh", "-NoLogo", "-NoProfileLoadTime", "-Command"]
+[windows]
+set shell := ["pwsh", "-NoLogo", "-NoProfileLoadTime", "-Command"]
 
 set ignore-comments
 
@@ -3084,13 +3086,12 @@ from highest to lowest, is:
 
 1. The `--shell` and `--shell-arg` command line options. Passing either of
    these will cause `just` to ignore any settings in the current justfile.
-2. `set windows-shell := [...]`
+2. `set windows-shell := [...]` (deprecated)
 3. `set windows-powershell` (deprecated)
 4. `set shell := [...]`
 
-Since `set windows-shell` has higher precedence than `set shell`, you can use
-`set windows-shell` to pick a shell on Windows, and `set shell` to pick a shell
-for all other platforms.
+Use the `[windows]` and `[unix]` attributes with `set shell` to use different a
+shells on Windows.
 
 ### Shell
 
@@ -3115,10 +3116,11 @@ an additional flag, often `-c`, to make them evaluate the first argument.
 #### Windows Shell
 
 `just` uses `sh` on Windows by default. To use a different shell on Windows,
-use `windows-shell`:
+use the `[windows]` attribute on the `shell` setting:
 
 ```just
-set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
+[windows]
+set shell := ["powershell.exe", "-NoLogo", "-Command"]
 
 hello:
   Write-Host "Hello, world!"
@@ -3127,22 +3129,6 @@ hello:
 See
 [powershell.just](https://github.com/casey/just/blob/master/examples/powershell.just)
 for a justfile that uses PowerShell on all platforms.
-
-#### Windows PowerShell
-
-*`set windows-powershell` uses the legacy `powershell.exe` binary, and is no
-longer recommended. See the `windows-shell` setting above for a more flexible
-way to control which shell is used on Windows.*
-
-`just` uses `sh` on Windows by default. To use `powershell.exe` instead, set
-`windows-powershell` to true.
-
-```just
-set windows-powershell := true
-
-hello:
-  Write-Host "Hello, world!"
-```
 
 #### Python 3
 
@@ -4817,8 +4803,8 @@ foo:
 | `shell` | `[COMMAND, ARGS…]` | - | Set command used to invoke recipes and evaluate backticks. |
 | `tempdir` | string | - | Create temporary directories in `tempdir` instead of the system default temporary directory. |
 | `unstable`<sup>1.31.0</sup> | boolean | `false` | Enable unstable features. |
-| `windows-powershell` | boolean | `false` | Use PowerShell on Windows as default shell. (Deprecated. Use `windows-shell` instead.) |
-| `windows-shell` | `[COMMAND, ARGS…]` | - | Set the command used to invoke recipes and evaluate backticks. |
+| `windows-powershell` | boolean | `false` | Use PowerShell on Windows as default shell. (Deprecated. Use the `[windows]` attribute on `set shell`.) |
+| `windows-shell` | `[COMMAND, ARGS…]` | - | Set the command used to invoke recipes and evaluate backticks. (Deprecated. Use the `[windows]` attribute on `set shell`.) |
 | `working-directory`<sup>1.33.0</sup> | string | - | Set the working directory for recipes and backticks, relative to the default working directory. |
 
 Boolean settings can be written as:
@@ -4978,6 +4964,9 @@ $ just
 - `is_dependency()` - Returns the string `true` if the current recipe is being
   run as a dependency of another recipe, rather than being run directly,
   otherwise returns the string `false`.
+
+- `num_jobs()`<sup>master</sup> — The value of `--jobs` or the empty list,
+  `[]`, if it was not passed.
 
 - `recipe_name()`<sup>1.53.0</sup> - Returns the name of the current recipe.
 
