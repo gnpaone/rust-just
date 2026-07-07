@@ -200,15 +200,20 @@ impl<'src> Justfile<'src> {
         let mut variable_references = HashSet::new();
 
         let mut stack = Vec::new();
+        let mut visited = HashSet::new();
 
         for invocation in &invocations {
-          stack.push(invocation.recipe);
+          if visited.insert(invocation.recipe.number) {
+            stack.push(invocation.recipe);
+          }
         }
 
         while let Some(recipe) = stack.pop() {
           variable_references.extend(&recipe.variable_references);
           for dependency in &recipe.dependencies {
-            stack.push(&dependency.recipe);
+            if visited.insert(dependency.recipe.number) {
+              stack.push(&dependency.recipe);
+            }
           }
         }
 
@@ -323,7 +328,10 @@ impl<'src> Justfile<'src> {
         if let Some(variable) = variable {
           print!("{}", scope.value(variable).unwrap().join());
         } else {
-          let width = scope.names().fold(0, |max, name| name.len().max(max));
+          let width = scope
+            .bindings()
+            .filter(|binding| !binding.private)
+            .fold(0, |max, binding| binding.name.lexeme().len().max(max));
 
           for binding in scope.bindings() {
             if !binding.private {
@@ -481,6 +489,7 @@ impl<'src> Justfile<'src> {
       dotenv,
       module,
       overrides,
+      scope,
       search,
     };
 
@@ -495,7 +504,13 @@ impl<'src> Justfile<'src> {
 
     let scope = outer.child();
 
-    let mut evaluator = Evaluator::new(&context, BTreeMap::new(), true, Some(recipe.name), &scope);
+    let mut evaluator = Evaluator::new(
+      &context,
+      BTreeMap::new(),
+      is_dependency,
+      Some(recipe.name),
+      &scope,
+    );
 
     if !config.yes && !recipe.confirm(&mut evaluator)? {
       return Err(Error::NotConfirmed {

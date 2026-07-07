@@ -14,6 +14,8 @@ pub(crate) struct Recipe<'src, D = Dependency<'src>> {
   #[serde(skip)]
   pub(crate) module_path: Option<Modulepath>,
   pub(crate) name: Name<'src>,
+  #[serde(skip)]
+  pub(crate) number: Number,
   pub(crate) parameters: Vec<Parameter<'src>>,
   pub(crate) priors: usize,
   pub(crate) private: bool,
@@ -71,7 +73,6 @@ impl<'src> Recipe<'src> {
         rest = &rest[1..];
         vec![argument.clone()]
       } else {
-        debug_assert!(parameter.default.is_some() || parameter.kind == ParameterKind::Star);
         Vec::new()
       };
 
@@ -229,13 +230,7 @@ impl<'src> Recipe<'src> {
       eprintln!("{prefix}#### {doc}{suffix}");
     }
 
-    let evaluator = Evaluator::new(
-      context,
-      BTreeMap::new(),
-      is_dependency,
-      Some(self.name),
-      scope,
-    );
+    let evaluator = Evaluator::new(context, env.clone(), is_dependency, Some(self.name), scope);
 
     let start = Instant::now();
     let result = if self.is_script(&context.module.settings) {
@@ -340,7 +335,7 @@ impl<'src> Recipe<'src> {
         }
         .stderr();
 
-        if let Some(timestamp) = config.timestamp() {
+        if let Some(timestamp) = config.timestamp()? {
           eprint!("[{}] ", color.paint(&timestamp));
         }
 
@@ -442,7 +437,7 @@ impl<'src> Recipe<'src> {
   ) -> RunResult<'src> {
     let config = &context.config;
 
-    if let Some(timestamp) = config.timestamp() {
+    if let Some(timestamp) = config.timestamp()? {
       let color = if config.highlight {
         config.color.command(config.command_color)
       } else {
@@ -494,14 +489,11 @@ impl<'src> Recipe<'src> {
           .unwrap_or_else(|| Interpreter::default_script_interpreter().clone()),
       )
     } else if self.body.first().is_some_and(Line::is_shebang) {
-      let line = evaluated_lines
-        .first()
-        .ok_or_else(|| Error::internal("evaluated_lines was empty"))?;
-
-      let shebang =
-        Shebang::new(line).ok_or_else(|| Error::internal(format!("bad shebang line: {line}")))?;
-
-      Executor::Shebang(shebang)
+      let shebang = &evaluated_lines[0];
+      Executor::Shebang(Shebang::new(shebang).ok_or_else(|| Error::InvalidShebang {
+        recipe: self.name,
+        shebang: shebang.into(),
+      })?)
     } else {
       Executor::Command(
         context

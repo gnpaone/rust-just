@@ -231,10 +231,14 @@ impl<'src> Lexer<'src> {
     // The width of the error site to highlight depends on the kind of error:
     let length = match kind {
       UnterminatedString | UnterminatedBacktick => {
-        let Some(kind) = StringKind::from_token_start(self.lexeme()) else {
-          return self.internal_error("Lexer::error: expected string or backtick token start");
-        };
-        kind.delimiter().len()
+        if self.lexeme().starts_with(Self::INTERPOLATION_END) {
+          Self::INTERPOLATION_END.len()
+        } else {
+          let Some(kind) = StringKind::from_token_start(self.lexeme()) else {
+            return self.internal_error("Lexer::error: expected string or backtick token start");
+          };
+          kind.delimiter().len()
+        }
       }
       // highlight the full token
       _ => self.lexeme().len(),
@@ -345,12 +349,12 @@ impl<'src> Lexer<'src> {
       return Ok(());
     }
 
-    let body_whitespace = &whitespace[..whitespace
+    let indentation = whitespace
       .char_indices()
-      .take(self.indentation().chars().count())
-      .map(|(i, _c)| i)
-      .next()
-      .unwrap_or(0)];
+      .nth(self.indentation().chars().count())
+      .map_or(whitespace.len(), |(i, _c)| i);
+
+    let body_whitespace = &whitespace[..indentation];
 
     let spaces = whitespace.chars().any(|c| c == ' ');
     let tabs = whitespace.chars().any(|c| c == '\t');
@@ -470,7 +474,6 @@ impl<'src> Lexer<'src> {
   fn lex_normal(&mut self, start: char) -> CompileResult<'src> {
     match start {
       ' ' | '\t' => self.lex_whitespace(),
-      '!' if self.rest().starts_with("!include") => Err(self.error(Include)),
       '!' => self.lex_choices('!', &[('=', BangEquals), ('~', BangTilde)], Bang),
       '#' => self.lex_comment(),
       '$' => self.lex_single(Dollar),
@@ -755,6 +758,8 @@ impl<'src> Lexer<'src> {
       self.token(Whitespace);
     } else if let Some(character) = self.next {
       return Err(self.error(InvalidEscapeSequence { character }));
+    } else {
+      return Err(self.error(EscapeEndOfFile));
     }
 
     Ok(())
@@ -827,11 +832,6 @@ impl<'src> Lexer<'src> {
   /// Cooked string: "[^"]*" # also processes escape sequences
   /// Raw string:    '[^']*'
   fn lex_string(&mut self, format_string_kind: Option<StringKind>) -> CompileResult<'src> {
-    let format = format_string_kind.is_some()
-      || self.tokens.last().is_some_and(|token| {
-        token.kind == TokenKind::Identifier && token.lexeme() == Keyword::F.lexeme()
-      });
-
     let kind = if let Some(kind) = format_string_kind {
       self.presume_str(Self::INTERPOLATION_END)?;
       kind
@@ -843,6 +843,12 @@ impl<'src> Lexer<'src> {
       self.presume_str(kind.delimiter())?;
       kind
     };
+
+    let format = format_string_kind.is_some()
+      || kind.delimiter != StringDelimiter::Backtick
+        && self.tokens.last().is_some_and(|token| {
+          token.kind == TokenKind::Identifier && token.lexeme() == Keyword::F.lexeme()
+        });
 
     let mut escape = false;
 
@@ -2294,8 +2300,8 @@ mod tests {
     offset: 12,
     line:   3,
     column: 0,
-    width:  3,
-    kind:   InconsistentLeadingWhitespace{expected: "\t\t", found: "\t  "},
+    width:  2,
+    kind:   MixedLeadingWhitespace{whitespace: "\t "},
   }
 
   error! {

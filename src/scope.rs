@@ -51,24 +51,20 @@ impl<'src, 'run> Scope<'src, 'run> {
     self.bindings.insert(binding);
   }
 
-  pub(crate) fn bound(&self, name: &str) -> bool {
-    self.bindings.contains_key(name)
+  pub(crate) fn binding(&self, name: &str) -> Option<&Binding<'src>> {
+    if let Some(binding) = self.bindings.get(name) {
+      Some(binding)
+    } else {
+      self.parent?.binding(name)
+    }
   }
 
   pub(crate) fn value(&self, name: &str) -> Option<&Value> {
-    if let Some(binding) = self.bindings.get(name) {
-      Some(&binding.value)
-    } else {
-      self.parent?.value(name)
-    }
+    Some(&self.binding(name)?.value)
   }
 
   pub(crate) fn bindings(&self) -> impl Iterator<Item = &Binding<'src>> {
     self.bindings.values()
-  }
-
-  pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
-    self.bindings.keys().copied()
   }
 
   pub(crate) fn parent(&self) -> Option<&'run Self> {

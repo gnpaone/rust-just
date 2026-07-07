@@ -290,3 +290,56 @@ fn format_string_followed_by_recipe() {
     )
     .success();
 }
+
+#[test]
+fn unterminated_format_string_error() {
+  Test::new()
+    .justfile("x := f'{{}}")
+    .stderr(
+      "
+        error: unterminated string
+         ——▶ justfile:1:10
+          │
+        1 │ x := f'{{}}
+          │          ^^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn mismatched_closing_delimiter_in_format_string() {
+  Test::new()
+    .justfile(
+      "
+        foo := f'{{ )
+        bar:
+      ",
+    )
+    .stderr(
+      "
+        error: mismatched closing delimiter `)`, did you mean to close the `{{` on line 1?
+         ——▶ justfile:1:13
+          │
+        1 │ foo := f'{{ )
+          │             ^
+      ",
+    )
+    .failure();
+}
+
+#[test]
+fn format_backticks_are_forbidden() {
+  Test::new()
+    .justfile("foo := f`echo {{ arch() }}`")
+    .stderr(
+      "
+        error: expected '&&', '!=', '!~', '||', comment, end of file, end of line, '==', '=~', '(', '+', '++', or '/', but found backtick
+         ——▶ justfile:1:9
+          │
+        1 │ foo := f`echo {{ arch() }}`
+          │         ^^^^^^^^^^^^^^^^^^^
+      ",
+    )
+    .failure();
+}
