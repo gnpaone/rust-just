@@ -1895,3 +1895,46 @@ fn trailing_comments_separated_by_blank_line() {
       ",
   );
 }
+
+#[test]
+fn first_line_shebang_is_not_a_doc_comment() {
+  assert_dump(
+    "
+      #!baz
+      foo:
+    ",
+    "
+      #!baz
+      foo:
+    ",
+  );
+
+  assert_dump(
+    "
+      foo:
+
+      #!baz
+      bar:
+    ",
+    "
+      foo:
+
+      # !baz
+      bar:
+    ",
+  );
+}
+
+#[test]
+fn empty_doc_comment_has_no_trailing_space() {
+  assert_dump(
+    "
+      #
+      foo:
+    ",
+    "
+      #
+      foo:
+    ",
+  );
+}

@@ -423,20 +423,31 @@ impl<'run, 'src> Parser<'run, 'src> {
     }
 
     let mut items = self.items.iter().rev();
-    if matches!(items.next(), Some(Item::Newline))
-      && matches!(items.next(), Some(Item::Comment(_)))
-      && matches!(items.next(), Some(Item::Newline) | None)
-    {
-      self.items.pop().unwrap();
 
-      if let Item::Comment(contents) = self.items.pop().unwrap() {
-        Some(contents[1..].trim_start().into())
-      } else {
-        unreachable!();
-      }
-    } else {
-      None
+    if !matches!(items.next()?, Item::Newline) {
+      return None;
     }
+
+    let Item::Comment(contents) = items.next()? else {
+      return None;
+    };
+
+    let first = match items.next() {
+      None => true,
+      Some(Item::Newline) => false,
+      Some(_) => return None,
+    };
+
+    if first && contents.starts_with("#!") {
+      return None;
+    }
+
+    let doc = contents[1..].trim_start().into();
+
+    self.items.pop().unwrap();
+    self.items.pop().unwrap();
+
+    Some(doc)
   }
 
   /// Parse a justfile, consumes self
@@ -640,7 +651,7 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     let mut parameters = Vec::new();
     while !self.next_is(ParenR) {
-      parameters.push((self.parse_name()?, self.numerator.next()));
+      parameters.push((self.parse_name()?, self.numerator.next_binding()));
       if !self.accepted(Comma)? {
         break;
       }
@@ -681,7 +692,7 @@ impl<'run, 'src> Parser<'run, 'src> {
       export,
       file_depth: self.file_depth,
       name,
-      number: self.numerator.next(),
+      number: self.numerator.next_binding(),
       prelude: false,
       private: private || name.lexeme().starts_with('_'),
       value,
@@ -1111,6 +1122,7 @@ impl<'run, 'src> Parser<'run, 'src> {
     #[derive(PartialEq, Eq)]
     enum State {
       Backslash,
+      BackslashCarriageReturn,
       Initial,
       Unicode,
       UnicodeValue { hex: String },
@@ -1133,19 +1145,26 @@ impl<'run, 'src> Parser<'run, 'src> {
           state = State::Unicode;
         }
         State::Backslash => {
+          state = State::Initial;
           match c {
             'n' => cooked.push('\n'),
             'r' => cooked.push('\r'),
             't' => cooked.push('\t'),
             '\\' => cooked.push('\\'),
             '\n' => {}
+            '\r' => state = State::BackslashCarriageReturn,
             '"' => cooked.push('"'),
             character => {
               return Err(token.error(CompileErrorKind::InvalidEscapeSequence { character }));
             }
           }
-          state = State::Initial;
         }
+        State::BackslashCarriageReturn => match c {
+          '\n' => state = State::Initial,
+          _ => {
+            return Err(token.error(CompileErrorKind::InvalidEscapeSequence { character: '\r' }));
+          }
+        },
         State::Unicode => match c {
           '{' => {
             state = State::UnicodeValue { hex: String::new() };
@@ -1181,11 +1200,13 @@ impl<'run, 'src> Parser<'run, 'src> {
       }
     }
 
-    if state != State::Initial {
-      return Err(token.error(CompileErrorKind::UnicodeEscapeUnterminated));
+    match state {
+      State::Initial => Ok(cooked),
+      State::BackslashCarriageReturn => {
+        Err(token.error(CompileErrorKind::InvalidEscapeSequence { character: '\r' }))
+      }
+      _ => Err(token.error(CompileErrorKind::UnicodeEscapeUnterminated)),
     }
-
-    Ok(cooked)
   }
 
   /// Parse a name from an identifier token
@@ -1422,6 +1443,7 @@ impl<'run, 'src> Parser<'run, 'src> {
       import_offsets: self.import_offsets.clone(),
       module_path: None,
       name,
+      number: self.numerator.next_recipe(),
       parameters: positional.into_iter().chain(variadic).collect(),
       priors,
       private,
@@ -1492,7 +1514,7 @@ impl<'run, 'src> Parser<'run, 'src> {
       min: min.map(|(_key, min)| min),
       multiple,
       name,
-      number: self.numerator.next(),
+      number: self.numerator.next_binding(),
       pattern,
       short,
       value,

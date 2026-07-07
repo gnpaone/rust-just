@@ -111,6 +111,7 @@ pub(crate) enum Error<'src> {
     recipe: &'src str,
     output_error: OutputError,
   },
+  DatetimeFormat(DatetimeFormatError),
   DefaultRecipeRequiresArguments {
     recipe: &'src str,
     min_arguments: usize,
@@ -188,6 +189,10 @@ pub(crate) enum Error<'src> {
   },
   Interrupted {
     signal: Signal,
+  },
+  InvalidShebang {
+    recipe: Name<'src>,
+    shebang: String,
   },
   ListInStringContext {
     context: StringContext<'src>,
@@ -700,6 +705,7 @@ impl ColorDisplay for Error<'_> {
           "cygpath successfully translated recipe `{recipe}` shebang interpreter path, but output was not utf8: {utf8_error}",
         )?,
       },
+      DatetimeFormat(source) => write!(f, "{source}")?,
       DefaultRecipeRequiresArguments {
         recipe,
         min_arguments,
@@ -814,6 +820,9 @@ impl ColorDisplay for Error<'_> {
       }
       Interrupted { signal } => {
         write!(f, "interrupted by {signal}")?;
+      }
+      InvalidShebang { recipe, shebang } => {
+        write!(f, "recipe `{recipe}` has invalid shebang `{shebang}`")?;
       }
       ListInStringContext { context, value, .. } => {
         write!(f, "list value {} {context}", value.color_display(color))?;
