@@ -983,7 +983,7 @@ impl<'run, 'src> Parser<'run, 'src> {
           }
           Ok(Expression::Call { name, arguments })
         } else {
-          Ok(Expression::Variable { name })
+          Ok(Expression::Variable { name, number: None })
         }
       }
     } else if self.next_is(ParenL) {
@@ -1032,7 +1032,7 @@ impl<'run, 'src> Parser<'run, 'src> {
     &mut self,
     state: StringState,
   ) -> CompileResult<'src, StringLiteral<'src>> {
-    let expand = if self.next_is(Identifier) {
+    let expand = if matches!(state, StringState::Normal) && self.next_is(Identifier) {
       self.expect_keyword(Keyword::X)?;
       true
     } else {
@@ -1066,7 +1066,7 @@ impl<'run, 'src> Parser<'run, 'src> {
 
     let raw = &token.lexeme()[open..token.lexeme().len() - close];
 
-    let unindented = if kind.indented() && matches!(token.kind, StringToken) {
+    let unindented = if kind.indented() && matches!(state, StringState::Normal) {
       unindent(raw)
     } else {
       raw.to_owned()

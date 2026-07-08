@@ -207,6 +207,11 @@ most Windows users.)
       <td><code>snap install --edge --classic just</code></td>
     </tr>
     <tr>
+      <td><a href=https://spack.io/>Spack</a></td>
+      <td><a href=https://packages.spack.io/package.html?name=just>just</a></td>
+      <td><code>spack install just</code></td>
+    </tr>
+    <tr>
       <td><a href=https://docs.astral.sh/uv/>uv</a></td>
       <td><a href=https://pypi.org/project/rust-just/>rust-just</a></td>
       <td><code>uv tool install rust-just</code></td>
@@ -2217,7 +2222,7 @@ once, assigning the list of passed values to the parameter. When combined with
 each occurance of the flag.
 
 The `[arg(min=MIN)]` and `[arg(max=MAX)]` attributes<sup>master</sup> can be
-used to limit the number of times an option or flag may be passed.
+used to limit the number of values an option or flag may receive.
 
 The value of `[arg(help)]` may be a list, in which case the help string is the
 elements of the list joined with spaces. If the list is empty, the argument has

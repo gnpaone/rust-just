@@ -179,7 +179,7 @@ fn absolute_path(context: Context, path: &str) -> StringResult {
     .execution_context
     .working_directory()
     .join(path)
-    .lexiclean();
+    .clean();
   match abs_path_unchecked.to_str() {
     Some(absolute_path) => Ok(absolute_path.to_owned()),
     None => Err(format!(
@@ -273,7 +273,7 @@ fn choose(_context: Context, n: &str, alphabet: &str) -> StringResult {
 }
 
 fn clean(_context: Context, path: &str) -> StringResult {
-  Ok(Path::new(path).lexiclean().to_str().unwrap().to_owned())
+  Ok(Path::new(path).clean().to_str().unwrap().to_owned())
 }
 
 fn dir(name: &'static str, f: fn() -> Option<PathBuf>) -> StringResult {
@@ -575,11 +575,12 @@ fn parent_directory(_context: Context, path: &str) -> StringResult {
 fn path_exists(context: Context, path: &str) -> ValueResult {
   Ok(boolean(
     &context,
-    context
-      .execution_context
-      .working_directory()
-      .join(path)
-      .exists(),
+    !path.is_empty()
+      && context
+        .execution_context
+        .working_directory()
+        .join(path)
+        .exists(),
   ))
 }
 
@@ -633,6 +634,22 @@ fn sha256_file(context: Context, path: &str) -> StringResult {
 }
 
 fn shell(context: Context, command: &str, args: &[String]) -> StringResult {
+  if context.execution_context.config.dry_run {
+    let mut output = String::from("shell(");
+    for (i, arg) in iter::once(command)
+      .chain(args.iter().map(String::as_str))
+      .enumerate()
+    {
+      if i > 0 {
+        output.push_str(", ");
+      }
+      output.push_str(&Element(arg).color_display(Color::never()).to_string());
+    }
+    output.push(')');
+
+    return Ok(output);
+  }
+
   Evaluator::run_command(
     context.execution_context,
     &BTreeMap::new(),
