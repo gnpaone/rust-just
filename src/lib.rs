@@ -11,7 +11,6 @@ pub(crate) use {
     analyzer::Analyzer,
     arg_attribute::ArgAttribute,
     assignment::Assignment,
-    assignment_resolver::AssignmentResolver,
     ast::Ast,
     attribute::{Attribute, AttributeKind},
     attribute_set::AttributeSet,
@@ -21,6 +20,7 @@ pub(crate) use {
     cache_key::CacheKey,
     cache_lock::CacheLock,
     cache_status::CacheStatus,
+    clean::Clean,
     color::Color,
     color_display::ColorDisplay,
     command_color::CommandColor,
@@ -53,6 +53,7 @@ pub(crate) use {
     execution_context::ExecutionContext,
     executor::Executor,
     expression::Expression,
+    expression_context::ExpressionContext,
     format_string_part::FormatStringPart,
     fragment::Fragment,
     function::Function,
@@ -69,6 +70,7 @@ pub(crate) use {
     lexer::Lexer,
     line::Line,
     list::List,
+    list_entry::ListEntry,
     list_feature::ListFeature,
     list_operator::ListOperator,
     load_dotenv::load_dotenv,
@@ -132,6 +134,7 @@ pub(crate) use {
     usage::Usage,
     use_color::UseColor,
     value::Value,
+    variable_resolver::VariableResolver,
     verbosity::Verbosity,
     version::Version,
     warning::Warning,
@@ -142,7 +145,6 @@ pub(crate) use {
   clap::{CommandFactory, FromArgMatches, Parser as _, ValueEnum},
   clap_complete::{ArgValueCompleter, CompletionCandidate, PathCompleter, engine::ValueCompleter},
   digest_io::HashWriter,
-  lexiclean::Lexiclean,
   libc::EXIT_FAILURE,
   rand::seq::IndexedRandom,
   regex::Regex,
@@ -153,7 +155,7 @@ pub(crate) use {
   sha2::{Digest, Sha256},
   snafu::{ResultExt, Snafu},
   std::{
-    borrow::{Borrow, Cow},
+    borrow::Borrow,
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet, btree_map},
     env::{self, VarError},
@@ -182,7 +184,10 @@ pub(crate) use {
 };
 
 #[cfg(test)]
-pub(crate) use crate::{node::Node, tree::Tree};
+pub(crate) use {
+  crate::{node::Node, tree::Tree},
+  std::borrow::Cow,
+};
 
 pub use crate::run::run;
 
@@ -228,7 +233,6 @@ mod analyzer;
 mod arg_attribute;
 mod arguments;
 mod assignment;
-mod assignment_resolver;
 mod ast;
 mod attribute;
 mod attribute_set;
@@ -238,6 +242,7 @@ mod cache_entry;
 mod cache_key;
 mod cache_lock;
 mod cache_status;
+mod clean;
 mod color;
 mod color_display;
 mod command_color;
@@ -270,6 +275,7 @@ mod evaluator;
 mod execution_context;
 mod executor;
 mod expression;
+mod expression_context;
 mod filesystem;
 mod format_string_part;
 mod fragment;
@@ -287,6 +293,7 @@ mod layer;
 mod lexer;
 mod line;
 mod list;
+mod list_entry;
 mod list_feature;
 mod list_operator;
 mod load_dotenv;
@@ -353,6 +360,7 @@ mod unstable_feature;
 mod usage;
 mod use_color;
 mod value;
+mod variable_resolver;
 mod verbosity;
 mod version;
 mod warning;
