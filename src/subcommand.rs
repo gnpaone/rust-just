@@ -219,7 +219,11 @@ impl Subcommand {
       if config.allow_missing
         && matches!(
           result,
-          Err(Error::UnknownRecipe { .. } | Error::UnknownSubmodule { .. })
+          Err(
+            Error::ModuleAbsent { .. }
+              | Error::UnknownRecipe { .. }
+              | Error::UnknownSubmodule { .. }
+          )
         )
       {
         return Ok(());
@@ -266,7 +270,7 @@ impl Subcommand {
         recipe.min_arguments() == 0
           && (groups.is_empty() || groups.intersection(&recipe.groups()).next().is_some())
       }));
-      stack.extend(module.public_modules(config));
+      stack.extend(module.public_modules(config).into_iter().rev());
     }
 
     if recipes.is_empty() {
