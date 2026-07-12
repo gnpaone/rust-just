@@ -261,7 +261,7 @@ fn duplicate_attribute_error() {
     .args(["foo", "BAR"])
     .stderr(
       "
-        error: recipe attribute for argument `bar` first used on line 1 is duplicated on line 2
+        error: attribute for argument `bar` first used on line 1 is duplicated on line 2
          ——▶ justfile:2:2
           │
         2 │ [arg('bar', pattern='BAR')]
@@ -909,6 +909,25 @@ fn star_variadic_without_arguments_below_min_is_an_error() {
     .unstable()
     .arg("foo")
     .stderr("error: recipe `foo` parameter `bar` got 0 values but takes at least 2\n")
+    .failure();
+}
+
+#[test]
+fn star_variadic_with_min_cannot_be_default_recipe() {
+  Test::new()
+    .justfile(
+      "
+        set lists
+
+        [arg('bar', min='1')]
+        foo *bar:
+          @echo {{ bar }}
+      ",
+    )
+    .unstable()
+    .stderr(
+      "error: recipe `foo` cannot be used as default recipe since it requires at least 1 argument\n",
+    )
     .failure();
 }
 

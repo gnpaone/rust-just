@@ -13,6 +13,8 @@ type Scopes<'src, 'run> = BTreeMap<
 pub(crate) struct Justfile<'src> {
   #[serde(skip)]
   pub(crate) absent_modules: BTreeSet<String>,
+  #[serde(skip)]
+  pub(crate) assignment_references: HashMap<Number, HashSet<Number>>,
   pub(crate) assignments: Table<'src, Assignment<'src>>,
   #[serde(rename = "first", serialize_with = "keyed::serialize_option")]
   pub(crate) default: Option<Arc<Recipe<'src>>>,
@@ -41,7 +43,7 @@ pub(crate) struct Justfile<'src> {
   pub(crate) recipes: Table<'src, Arc<Recipe<'src>>>,
   pub(crate) settings: Settings,
   pub(crate) source: PathBuf,
-  pub(crate) unexports: HashSet<String>,
+  pub(crate) unexports: BTreeSet<String>,
   #[serde(skip)]
   pub(crate) unstable_features: BTreeSet<UnstableFeature>,
   pub(crate) warnings: Vec<Warning>,
@@ -125,7 +127,7 @@ impl<'src> Justfile<'src> {
       } else {
         &search.working_directory
       };
-      load_dotenv(config, &self.settings, working_directory)?
+      load_dotenv(config, self, working_directory)?
     } else {
       BTreeMap::new()
     };
@@ -144,6 +146,20 @@ impl<'src> Justfile<'src> {
 
     let lazy = lazy || self.settings.lazy;
 
+    let assignment_variable_references = if lazy {
+      let mut references = variable_references.clone();
+
+      for assignment in self.assignments.values() {
+        if assignment.eager || assignment.export || self.settings.export {
+          references.extend(&self.assignment_references[&assignment.number]);
+        }
+      }
+
+      Some(references)
+    } else {
+      None
+    };
+
     let scope = Evaluator::evaluate_assignments(
       config,
       dotenv,
@@ -151,7 +167,7 @@ impl<'src> Justfile<'src> {
       overrides,
       root,
       search,
-      lazy.then_some(variable_references),
+      assignment_variable_references.as_ref(),
     )?;
 
     let scope = scope_arena.alloc(scope);
@@ -399,6 +415,8 @@ impl<'src> Justfile<'src> {
 
       if let Some(module) = current.modules.get(component) {
         current = module;
+      } else if let Some(alias) = current.module_aliases.get(component) {
+        current = self.submodule(&alias.target).unwrap();
       } else if current.absent_modules.contains(component) {
         return Err(Error::ModuleAbsent {
           module: current.module_path.join(component),
@@ -417,13 +435,14 @@ impl<'src> Justfile<'src> {
     }
 
     let variable_references = if let Some(assignment) = variable {
-      HashSet::from([assignment.number])
+      current.assignment_references[&assignment.number].clone()
     } else {
       current
         .assignments
         .values()
         .filter(|assignment| !assignment.private)
-        .map(|assignment| assignment.number)
+        .flat_map(|assignment| &current.assignment_references[&assignment.number])
+        .copied()
         .collect()
     };
 

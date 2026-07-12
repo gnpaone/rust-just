@@ -71,6 +71,14 @@ pub(crate) enum CompileErrorKind<'src> {
   DuplicateDefault {
     recipe: &'src str,
   },
+  DuplicateFunctionParameter {
+    function: &'src str,
+    parameter: &'src str,
+  },
+  DuplicateGroupAttribute {
+    first: usize,
+    group: StringLiteral<'src>,
+  },
   DuplicateOption {
     recipe: &'src str,
     option: Switch,
@@ -179,6 +187,9 @@ pub(crate) enum CompileErrorKind<'src> {
     parameter: String,
   },
   OptionNameEmpty {
+    parameter: String,
+  },
+  OptionNameStartsWithDash {
     parameter: String,
   },
   ParameterFollowsVariadicParameter {

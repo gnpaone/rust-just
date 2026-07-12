@@ -349,7 +349,7 @@ fn attribute_duplicate() {
       ",
     )
     .stderr(
-      "error: recipe attribute `working-directory` first used on line 1 is duplicated on line 2
+      "error: attribute `working-directory` first used on line 1 is duplicated on line 2
  ——▶ justfile:2:2
   │
 2 │ [working-directory('baz')]
@@ -505,4 +505,21 @@ fn attribute_undefined_variable() {
       ",
     )
     .failure();
+}
+
+#[test]
+fn false_no_cd_does_not_conflict_with_working_directory() {
+  Test::new()
+    .justfile(
+      "
+        set no-cd := false
+        set working-directory := 'foo'
+
+        bar:
+          @echo baz
+      ",
+    )
+    .create_dir("foo")
+    .stdout("baz\n")
+    .success();
 }

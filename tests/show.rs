@@ -230,6 +230,31 @@ fn show_cross_module_dependencies() {
 }
 
 #[test]
+fn show_prints_full_recipe_path_for_cross_module_alias() {
+  Test::new()
+    .write("foo.just", "bar:\n  @echo SUB\n")
+    .justfile(
+      "
+        mod foo
+
+        alias f := foo::bar
+
+        bar:
+          @echo ROOT
+      ",
+    )
+    .args(["--show", "f"])
+    .stdout(
+      "
+        alias f := foo::bar
+        bar:
+            @echo SUB
+      ",
+    )
+    .success();
+}
+
+#[test]
 fn show_prints_doc_comment_and_attributes() {
   Test::new()
     .justfile(
@@ -267,4 +292,60 @@ fn show_prints_doc_attribute_without_doc_comment() {
       ",
     )
     .success();
+}
+
+#[test]
+fn show_prints_bare_dependency_on_parameterized_recipe_without_parentheses() {
+  Test::new()
+    .justfile(
+      "
+        foo bar='baz':
+            @echo {{ bar }}
+
+        baz: foo
+            @echo baz
+      ",
+    )
+    .args(["--show", "baz"])
+    .stdout(
+      "
+        baz: foo
+            @echo baz
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn show_recipe_disabled_by_absent_module() {
+  Test::new()
+    .justfile(
+      "
+        mod? foo
+
+        bar: foo::baz
+          @echo bar
+      ",
+    )
+    .args(["--show", "bar"])
+    .stderr("error: recipe `bar` depends on absent module `foo`\n")
+    .failure();
+}
+
+#[test]
+fn show_alias_disabled_by_absent_module() {
+  Test::new()
+    .justfile(
+      "
+        mod? foo
+
+        alias b := bar
+
+        bar: foo::baz
+          @echo bar
+      ",
+    )
+    .args(["--show", "b"])
+    .stderr("error: alias `b` depends on absent module `foo`\n")
+    .failure();
 }

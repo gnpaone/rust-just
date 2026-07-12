@@ -195,7 +195,11 @@ impl Subcommand {
       if fallback
         && let Err(err @ (Error::UnknownRecipe { .. } | Error::UnknownSubmodule { .. })) = result
       {
-        search = search.search_parent_directory(config).map_err(|_| err)?;
+        search = match search.search_parent_directory(config) {
+          Ok(search) => search,
+          Err(SearchError::NotFound) => return Err(err),
+          Err(search_error) => return Err(search_error.into()),
+        };
 
         if config.verbosity.loquacious() {
           eprintln!(
@@ -606,7 +610,7 @@ impl Subcommand {
     Ok(())
   }
 
-  fn list(config: &Config, root: &Justfile, path: &Modulepath) -> RunResult<'static> {
+  fn list<'src>(config: &Config, root: &Justfile<'src>, path: &Modulepath) -> RunResult<'src> {
     let mut module = root;
 
     for name in &path.components {
@@ -621,6 +625,7 @@ impl Subcommand {
       } else {
         return Err(Error::UnknownSubmodule {
           path: path.to_string(),
+          suggestion: module.suggest_submodule(name),
         });
       }
     }
@@ -1005,9 +1010,11 @@ impl Subcommand {
   pub(crate) fn takes_arguments(&self) -> bool {
     match self {
       Self::Changelog
+      | Self::Completions { .. }
       | Self::Dump { .. }
       | Self::Edit
       | Self::Format
+      | Self::Groups
       | Self::Init
       | Self::Man
       | Self::Summary
@@ -1015,9 +1022,7 @@ impl Subcommand {
       Self::Choose { .. }
       | Self::Clean { .. }
       | Self::Command { .. }
-      | Self::Completions { .. }
       | Self::Evaluate { .. }
-      | Self::Groups
       | Self::List { .. }
       | Self::Request { .. }
       | Self::Run { .. }
@@ -1069,6 +1074,7 @@ impl Subcommand {
       } else {
         return Err(Error::UnknownSubmodule {
           path: path.to_string(),
+          suggestion: module.suggest_submodule(name),
         });
       }
     }
@@ -1077,6 +1083,16 @@ impl Subcommand {
       Ok((Some(alias), &alias.target))
     } else if let Some(recipe) = module.recipe(name) {
       Ok((None, recipe))
+    } else if let Some(disabled) = module.disabled_recipes.get(name) {
+      Err(Error::RecipeDisabled {
+        recipe: path.clone(),
+        modules: disabled.modules.clone(),
+      })
+    } else if let Some(disabled) = module.disabled_aliases.get(name) {
+      Err(Error::AliasDisabled {
+        alias: path.clone(),
+        modules: disabled.modules.clone(),
+      })
     } else {
       Err(Error::UnknownRecipe {
         recipe: name.to_owned(),

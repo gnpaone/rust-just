@@ -46,7 +46,9 @@ impl Function {
   }
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct Context<'src: 'run, 'run> {
+  pub(crate) env: &'run BTreeMap<String, String>,
   pub(crate) execution_context: &'run ExecutionContext<'src, 'run>,
   pub(crate) is_dependency: bool,
   pub(crate) name: Name<'src>,
@@ -650,7 +652,7 @@ fn shell(context: Context, command: &str, args: &[String]) -> StringResult {
 
   Evaluator::run_command(
     context.execution_context,
-    &BTreeMap::new(),
+    context.env,
     context.scope,
     command,
     Some(args),
@@ -713,10 +715,10 @@ fn source_file(context: Context) -> StringResult {
 }
 
 fn split(_context: Context, s: &str, separator: Option<&str>) -> ValueResult {
-  Ok(if let Some(separator) = separator {
-    s.split(separator).map(str::to_string).collect()
-  } else {
-    s.split_whitespace().map(str::to_string).collect()
+  Ok(match separator {
+    None => s.split_whitespace().map(str::to_string).collect(),
+    Some("") => s.chars().map(String::from).collect(),
+    Some(separator) => s.split(separator).map(str::to_string).collect(),
   })
 }
 

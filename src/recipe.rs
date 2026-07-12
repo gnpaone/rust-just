@@ -293,7 +293,7 @@ impl<'src> Recipe<'src> {
           break;
         }
         let line = lines.next().unwrap();
-        line_number += 1;
+        line_number = line.number + 1;
         if !comment_line {
           evaluated += &evaluator.evaluate_line(line, continued)?;
         }
@@ -454,15 +454,15 @@ impl<'src> Recipe<'src> {
     }
 
     if config.verbosity.loud() && (config.dry_run || self.quiet) {
+      let color = if config.highlight {
+        config.color.command(config.command_color)
+      } else {
+        config.color
+      }
+      .stderr();
+
       for line in &evaluated_lines {
-        eprintln!(
-          "{}",
-          config
-            .color
-            .command(config.command_color)
-            .stderr()
-            .paint(line)
-        );
+        eprintln!("{}", color.paint(line));
       }
     }
 

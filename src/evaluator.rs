@@ -23,6 +23,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
 
   pub(crate) fn evaluate_const_assignments(
     assignments: &'run Table<'src, Assignment<'src>>,
+    evaluation_order: &[Name<'src>],
     overrides: &'run HashMap<Number, String>,
     scope: &'run Scope<'src, 'run>,
     variable_references: &HashSet<Number>,
@@ -41,7 +42,8 @@ impl<'src, 'run> Evaluator<'src, 'run> {
       scope: scope.child(),
     };
 
-    for assignment in assignments.values() {
+    for assignment in evaluation_order {
+      let assignment = &assignments[assignment.lexeme()];
       if variable_references.contains(&assignment.number) {
         match evaluator
           .evaluate_assignment(assignment)
@@ -60,7 +62,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
   }
 
   pub(crate) fn evaluate_sets(
-    &mut self,
+    &self,
     sets: Table<'src, Set<'src>>,
   ) -> CompileResult<'src, Settings> {
     let mut settings = Settings::default();
@@ -164,7 +166,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
   }
 
   pub(crate) fn evaluate_interpreter(
-    &mut self,
+    &self,
     interpreter: &Interpreter<Expression<'src>>,
     setting: Name<'src>,
   ) -> CompileResult<'src, Interpreter<String>> {
@@ -222,12 +224,9 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     };
 
     for assignment in &module.evaluation_order {
-      let assignment = module.assignments.get(assignment.lexeme()).unwrap();
-      if assignment.eager
-        || assignment.export
-        || module.settings.export
-        || variable_references
-          .is_none_or(|variable_references| variable_references.contains(&assignment.number))
+      let assignment = &module.assignments[assignment.lexeme()];
+      if variable_references
+        .is_none_or(|variable_references| variable_references.contains(&assignment.number))
       {
         evaluator.evaluate_assignment(assignment)?;
       }
@@ -265,6 +264,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
 
   fn function_context(&self, name: Name<'src>) -> RunResult<'src, function::Context> {
     Ok(function::Context {
+      env: &self.env,
       execution_context: self.context(ConstError::FunctionCall(name))?,
       is_dependency: self.is_dependency,
       name,
@@ -274,7 +274,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
   }
 
   fn evaluate_defined_function(
-    &mut self,
+    &self,
     function: &FunctionDefinition<'src>,
     arguments: &[Expression<'src>],
   ) -> RunResult<'src, Value> {
@@ -314,7 +314,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
       });
     }
 
-    let mut evaluator = Evaluator {
+    let evaluator = Evaluator {
       assignments: Some(&context.module.assignments),
       context: Some(context),
       env: BTreeMap::new(),
@@ -331,31 +331,27 @@ impl<'src, 'run> Evaluator<'src, 'run> {
   }
 
   fn evaluate_builtin_function(
-    &mut self,
+    &self,
     name: Name<'src>,
     function: Function,
     arguments: &[Expression<'src>],
   ) -> RunResult<'src, Value> {
-    macro_rules! context {
-      () => {
-        self.function_context(name).unwrap()
-      };
-    }
+    let context = self.function_context(name).unwrap();
     match function {
-      Function::Nullary(f) => f(context!()).map(Value::from),
+      Function::Nullary(f) => f(context).map(Value::from),
       Function::Unary(f) => {
         let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
-        f(context!(), &a).map(Value::from)
+        f(context, &a).map(Value::from)
       }
       Function::UnaryToValue(f) => {
         let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
-        f(context!(), &a)
+        f(context, &a)
       }
       Function::UnaryMap(f) => {
         let a = self.evaluate_value(&arguments[0])?;
         a.elements()
           .iter()
-          .map(|element| f(context!(), element))
+          .map(|element| f(context, element))
           .collect()
       }
       Function::UnaryPlus(f) => {
@@ -364,22 +360,22 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         for arg in &arguments[1..] {
           rest.push(self.evaluate_string(arg, StringContext::Function(name))?);
         }
-        f(context!(), &a, &rest).map(Value::from)
+        f(context, &a, &rest).map(Value::from)
       }
       Function::BinaryStrValue(f) => {
         let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
         let b = self.evaluate_value(&arguments[1])?;
-        f(context!(), &a, &b)
+        f(context, &a, &b)
       }
       Function::Binary(f) => {
         let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
         let b = self.evaluate_string(&arguments[1], StringContext::Function(name))?;
-        f(context!(), &a, &b).map(Value::from)
+        f(context, &a, &b).map(Value::from)
       }
       Function::BinaryToValue(f) => {
         let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
         let b = self.evaluate_string(&arguments[1], StringContext::Function(name))?;
-        f(context!(), &a, &b)
+        f(context, &a, &b)
       }
       Function::BinaryPlus(f) => {
         let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
@@ -388,23 +384,23 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         for arg in &arguments[2..] {
           rest.push(self.evaluate_string(arg, StringContext::Function(name))?);
         }
-        f(context!(), &a, &b, &rest).map(Value::from)
+        f(context, &a, &b, &rest).map(Value::from)
       }
       Function::Ternary(f) => {
         let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
         let b = self.evaluate_string(&arguments[1], StringContext::Function(name))?;
         let c = self.evaluate_string(&arguments[2], StringContext::Function(name))?;
-        f(context!(), &a, &b, &c).map(Value::from)
+        f(context, &a, &b, &c).map(Value::from)
       }
-      Function::ValueNullary(f) => f(context!()),
+      Function::ValueNullary(f) => f(context),
       Function::ValueUnary(f) => {
         let a = self.evaluate_value(&arguments[0])?;
-        f(context!(), &a)
+        f(context, &a)
       }
       Function::ValueBinary(f) => {
         let a = self.evaluate_value(&arguments[0])?;
         let b = self.evaluate_value(&arguments[1])?;
-        f(context!(), &a, &b)
+        f(context, &a, &b)
       }
       Function::ValueBinaryOpt(f) => {
         let a = self.evaluate_value(&arguments[0])?;
@@ -413,7 +409,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         } else {
           None
         };
-        f(context!(), &a, b.as_ref())
+        f(context, &a, b.as_ref())
       }
       Function::BinaryOptToValue(f) => {
         let a = self.evaluate_string(&arguments[0], StringContext::Function(name))?;
@@ -422,7 +418,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         } else {
           None
         };
-        f(context!(), &a, b.as_deref())
+        f(context, &a, b.as_deref())
       }
       Function::BinaryOptValueStr(f) => {
         let a = self.evaluate_value(&arguments[0])?;
@@ -431,7 +427,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         } else {
           None
         };
-        f(context!(), &a, b.as_deref()).map(Value::from)
+        f(context, &a, b.as_deref()).map(Value::from)
       }
       Function::BinaryOptValueStrToValue(f) => {
         let a = self.evaluate_value(&arguments[0])?;
@@ -440,7 +436,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         } else {
           None
         };
-        f(context!(), &a, b.as_deref())
+        f(context, &a, b.as_deref())
       }
     }
     .map_err(|message| Error::FunctionCall {
@@ -450,7 +446,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
   }
 
   pub(crate) fn evaluate_string(
-    &mut self,
+    &self,
     expression: &Expression<'src>,
     context: StringContext<'src>,
   ) -> RunResult<'src, String> {
@@ -464,7 +460,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
   }
 
   pub(crate) fn evaluate_value_const(
-    &mut self,
+    &self,
     expression: &Expression<'src>,
   ) -> CompileResult<'src, Value> {
     assert!(self.context.is_none());
@@ -474,7 +470,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
   }
 
   pub(crate) fn evaluate_string_const(
-    &mut self,
+    &self,
     expression: &Expression<'src>,
     context: StringContext<'src>,
   ) -> CompileResult<'src, String> {
@@ -484,7 +480,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
       .map_err(|error| error.unwrap_const().into_compile_error())
   }
 
-  pub(crate) fn evaluate_value(&mut self, expression: &Expression<'src>) -> RunResult<'src, Value> {
+  pub(crate) fn evaluate_value(&self, expression: &Expression<'src>) -> RunResult<'src, Value> {
     match expression {
       Expression::And { lhs, rhs } => {
         let lhs = self.evaluate_value(lhs)?;
@@ -627,21 +623,16 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           Err(ConstError::Variable(*name).into())
         } else if let Some(binding) = self.scope.binding(*number) {
           Ok(binding.value.clone())
-        } else if let Some(assignment) = self
-          .assignments
-          .and_then(|assignments| assignments.assignment(*number))
-        {
-          Ok(self.evaluate_assignment(assignment)?.clone())
         } else {
           Err(Error::internal(format!(
-            "attempted to evaluate undefined variable `{name}`"
+            "attempted to evaluate unevaluated variable `{name}`"
           )))
         }
       }
     }
   }
 
-  fn evaluate_boolean(&mut self, condition: &Expression<'src>) -> RunResult<'src, bool> {
+  fn evaluate_boolean(&self, condition: &Expression<'src>) -> RunResult<'src, bool> {
     let Expression::Comparison {
       lhs,
       operator,
@@ -731,7 +722,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
   }
 
   pub(crate) fn evaluate_line(
-    &mut self,
+    &self,
     line: &Line<'src>,
     continued: bool,
   ) -> RunResult<'src, String> {

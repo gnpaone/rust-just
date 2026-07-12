@@ -8,7 +8,7 @@ pub(crate) struct Analyzer<'run, 'src> {
   modules: Table<'src, Justfile<'src>>,
   recipes: Vec<&'run Recipe<'src, UnresolvedDependency<'src>>>,
   sets: Table<'src, Set<'src>>,
-  unexports: HashSet<String>,
+  unexports: BTreeSet<String>,
   warnings: Vec<Warning>,
 }
 
@@ -186,13 +186,32 @@ impl<'run, 'src> Analyzer<'run, 'src> {
           first: first.name.line,
         }));
       }
+
+      let mut parameters = BTreeSet::new();
+      for (parameter, _) in &function.parameters {
+        if !parameters.insert(parameter.lexeme()) {
+          return Err(parameter.error(DuplicateFunctionParameter {
+            function: name,
+            parameter: parameter.lexeme(),
+          }));
+        }
+      }
+
       functions.insert(function.clone());
+    }
+
+    for ((path, name), value) in &config.overrides {
+      if *path == ast.module_path
+        && let Some(assignment) = assignments.get(name)
+      {
+        overrides.insert(assignment.number, value.clone());
+      }
     }
 
     let (bindings, evaluation_order) =
       VariableResolver::resolve_assignments(&mut assignments, &mut functions)?;
 
-    let variable_resolver = VariableResolver::new(&assignments, bindings, &functions);
+    let variable_resolver = VariableResolver::new(&assignments, bindings, &functions, overrides);
 
     let mut variable_references = HashSet::new();
 
@@ -206,14 +225,6 @@ impl<'run, 'src> Analyzer<'run, 'src> {
       }
     }
 
-    for ((path, name), value) in &config.overrides {
-      if *path == ast.module_path
-        && let Some(assignment) = assignments.get(name)
-      {
-        overrides.insert(assignment.number, value.clone());
-      }
-    }
-
     let scope = Scope::root();
 
     let mut evaluator = {
@@ -221,6 +232,15 @@ impl<'run, 'src> Analyzer<'run, 'src> {
         .sets
         .values()
         .any(|set| matches!(set.value, Setting::Lists(true)));
+
+      let mut collect_references = |expression| {
+        variable_resolver.collect_references(
+          expression,
+          &ExpressionContext::new(),
+          &mut variable_references,
+          &mut HashSet::new(),
+        );
+      };
 
       for attribute in self.recipes.iter().flat_map(|recipe| &recipe.attributes) {
         match attribute {
@@ -230,25 +250,26 @@ impl<'run, 'src> Analyzer<'run, 'src> {
             ..
           } => {
             if let Some((_, expression)) = help_property {
-              variable_resolver.collect_references(expression, &mut variable_references);
+              collect_references(expression);
             }
             if let Some((_, expression)) = pattern_property {
-              variable_resolver.collect_references(expression, &mut variable_references);
+              collect_references(expression);
             }
           }
           Attribute::Doc(Some(expression)) => {
-            variable_resolver.collect_references(expression, &mut variable_references);
+            collect_references(expression);
           }
           _ => {}
         }
       }
 
       for (_name, expression) in &module_docs {
-        variable_resolver.collect_references(expression, &mut variable_references);
+        collect_references(expression);
       }
 
       Evaluator::evaluate_const_assignments(
         &assignments,
+        &evaluation_order,
         overrides,
         &scope,
         &variable_references,
@@ -394,13 +415,32 @@ impl<'run, 'src> Analyzer<'run, 'src> {
       }
     }
 
+    let mut assignment_references = HashMap::new();
+    for assignment in assignments.values() {
+      let mut references = HashSet::from([assignment.number]);
+      if !overrides.contains_key(&assignment.number) {
+        variable_resolver.collect_references(
+          &assignment.value,
+          &ExpressionContext::new(),
+          &mut references,
+          &mut HashSet::new(),
+        );
+      }
+      assignment_references.insert(assignment.number, references);
+    }
+
     let source = root.to_owned();
     let root = paths.get(root).unwrap();
 
-    let mut default = None;
+    let mut default = None::<Arc<Recipe>>;
     for recipe in recipes.values() {
       if recipe.attributes.contains(AttributeKind::Default) {
-        if default.is_some() {
+        if let Some(previous) = &default {
+          let recipe = if previous.line_number() > recipe.line_number() {
+            previous
+          } else {
+            recipe
+          };
           return Err(recipe.name.error(CompileErrorKind::DuplicateDefault {
             recipe: recipe.name.lexeme(),
           }));
@@ -426,11 +466,12 @@ impl<'run, 'src> Analyzer<'run, 'src> {
 
     Ok(Justfile {
       absent_modules,
+      assignment_references,
       assignments,
       default,
       disabled_aliases,
       disabled_recipes,
-      doc: doc.filter(|doc| !doc.is_empty()),
+      doc,
       evaluation_order,
       functions,
       groups: groups.into(),
@@ -493,7 +534,7 @@ impl<'run, 'src> Analyzer<'run, 'src> {
 
       parameters.insert(parameter.name.lexeme());
 
-      if parameter.default.is_some() {
+      if parameter.default.is_some() && !parameter.is_option() {
         passed_default = true;
       } else if passed_default && parameter.is_required() && !parameter.is_option() {
         return Err(
@@ -520,7 +561,9 @@ impl<'run, 'src> Analyzer<'run, 'src> {
 
     if let Some(second) = Keyword::from_lexeme(set.name.lexeme()) {
       for &first in set.value.conflicts() {
-        if let Some(conflict) = self.sets.get(first.lexeme()) {
+        if let Some(conflict) = self.sets.get(first.lexeme())
+          && conflict.value.conflicts().contains(&second)
+        {
           return Err(set.name.error(IncompatibleSettings {
             first,
             first_line: conflict.name.line,
