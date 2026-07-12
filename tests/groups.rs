@@ -392,3 +392,39 @@ fn list_group_with_submodules() {
     )
     .success();
 }
+
+#[test]
+fn reject_extra_arguments() {
+  Test::new()
+    .justfile(
+      "
+        [group('foo')]
+        bar:
+      ",
+    )
+    .args(["--groups", "baz"])
+    .stderr("error: `--groups` used with unexpected argument: `baz`\n")
+    .failure();
+}
+
+#[test]
+fn forbid_duplicate_groups() {
+  Test::new()
+    .justfile(
+      "
+        [group('a')]
+        [group('a')]
+        foo:
+      ",
+    )
+    .stderr(
+      "
+        error: `[group('a')]` attribute first used on line 1 is duplicated on line 2
+         ——▶ justfile:2:2
+          │
+        2 │ [group('a')]
+          │  ^^^^^
+      ",
+    )
+    .failure();
+}

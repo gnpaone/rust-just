@@ -141,6 +141,65 @@ fn assignment_used_in_dependency_argument_evaluated() {
 }
 
 #[test]
+fn assignment_used_in_function_body_is_only_evaluated_once() {
+  Test::new()
+    .justfile(
+      "
+      set lazy
+
+      c := `echo x >> count; wc -l < count | tr -d ' '`
+      f(y) := y + c
+
+      foo:
+        @echo {{ f('') }}{{ f('') }}
+    ",
+    )
+    .unstable()
+    .arg("foo")
+    .stdout("11\n")
+    .expect_file("count", "x\n")
+    .success();
+
+  Test::new()
+    .justfile(
+      "
+      set lazy
+
+      c := `echo x >> count; wc -l < count | tr -d ' '`
+      f(y) := y + g()
+      g() := c
+
+      foo:
+        @echo {{ f('') }}{{ f('') }}
+    ",
+    )
+    .unstable()
+    .arg("foo")
+    .stdout("11\n")
+    .expect_file("count", "x\n")
+    .success();
+
+  Test::new()
+    .justfile(
+      "
+      set lazy
+
+      c := `echo x >> count; wc -l < count | tr -d ' '`
+      f(y) := y + c
+      a := f('') + f('')
+
+      foo:
+        @echo {{ a }}
+    ",
+    )
+    .unstable()
+    .arg("foo")
+    .stdout("11\n")
+    .expect_file("count", "x\n")
+    .success();
+}
+
+#[test]
 fn assignment_in_body_interpolation_evaluated() {
   Test::new()
     .justfile(
@@ -276,6 +335,77 @@ fn assignment_with_set_export_is_evaluated() {
       ",
     )
     .stdout("FOO\n")
+    .success();
+}
+
+#[test]
+fn unconditionally_evaluated_assignment_dependencies_are_evaluated() {
+  Test::new()
+    .justfile(
+      "
+        set lazy
+
+        x := 'bar'
+        export e := x
+
+        foo:
+          @echo $e
+      ",
+    )
+    .arg("foo")
+    .stdout("bar\n")
+    .success();
+
+  Test::new()
+    .justfile(
+      "
+        set lazy
+
+        x := 'bar'
+        eager e := x
+
+        foo:
+          @echo baz
+      ",
+    )
+    .arg("foo")
+    .stdout("baz\n")
+    .success();
+
+  Test::new()
+    .justfile(
+      "
+        set lazy
+        set export
+
+        x := 'bar'
+        e := x
+
+        foo:
+          @echo $e
+      ",
+    )
+    .arg("foo")
+    .stdout("bar\n")
+    .success();
+}
+
+#[test]
+fn overridden_assignment_dependencies_are_not_evaluated() {
+  Test::new()
+    .justfile(
+      "
+        set lazy
+
+        x := `exit 1`
+        y := x
+
+        foo:
+          @echo {{ y }}
+      ",
+    )
+    .args(["y=bar", "foo"])
+    .stdout("bar\n")
     .success();
 }
 

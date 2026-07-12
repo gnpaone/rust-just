@@ -6,6 +6,7 @@ pub(crate) struct VariableResolver<'src: 'run, 'run> {
   evaluated: BTreeSet<&'src str>,
   evaluation_order: Vec<Name<'src>>,
   functions: &'run Table<'src, FunctionDefinition<'src>>,
+  overrides: &'run HashMap<Number, String>,
   stack: Vec<&'src str>,
 }
 
@@ -14,6 +15,8 @@ impl<'src: 'run, 'run> VariableResolver<'src, 'run> {
     assignments: &mut Table<'src, Assignment<'src>>,
     functions: &mut Table<'src, FunctionDefinition<'src>>,
   ) -> CompileResult<'src, (HashMap<&'src str, Number>, Vec<Name<'src>>)> {
+    let overrides = HashMap::new();
+
     let evaluation_order = {
       let mut resolver = VariableResolver {
         assignments,
@@ -21,6 +24,7 @@ impl<'src: 'run, 'run> VariableResolver<'src, 'run> {
         evaluated: BTreeSet::new(),
         evaluation_order: Vec::new(),
         functions,
+        overrides: &overrides,
         stack: Vec::new(),
       };
 
@@ -66,6 +70,7 @@ impl<'src: 'run, 'run> VariableResolver<'src, 'run> {
     assignments: &'run Table<'src, Assignment<'src>>,
     bindings: HashMap<&'src str, Number>,
     functions: &'run Table<'src, FunctionDefinition<'src>>,
+    overrides: &'run HashMap<Number, String>,
   ) -> Self {
     Self {
       assignments,
@@ -73,6 +78,7 @@ impl<'src: 'run, 'run> VariableResolver<'src, 'run> {
       evaluated: BTreeSet::new(),
       evaluation_order: Vec::new(),
       functions,
+      overrides,
       stack: Vec::new(),
     }
   }
@@ -88,16 +94,17 @@ impl<'src: 'run, 'run> VariableResolver<'src, 'run> {
         Reference::Call { name, arguments } => self.resolve_call(name, arguments)?,
         Reference::Variable(variable) => {
           let name = variable.lexeme();
-          if context.lookup(name).is_none() {
-            if let Some(assignment) = self.assignments.get(name) {
-              references.insert(assignment.number);
-            } else if !constants().contains_key(name) {
-              return Err(variable.error(UndefinedVariable { variable: name }));
-            }
+          if context.lookup(name).is_none()
+            && !self.assignments.contains_key(name)
+            && !constants().contains_key(name)
+          {
+            return Err(variable.error(UndefinedVariable { variable: name }));
           }
         }
       }
     }
+
+    self.collect_references(expression, context, references, &mut HashSet::new());
 
     expression.resolve_variables(Some(context), &self.bindings);
 
@@ -107,13 +114,38 @@ impl<'src: 'run, 'run> VariableResolver<'src, 'run> {
   pub(crate) fn collect_references(
     &self,
     expression: &Expression<'src>,
+    context: &ExpressionContext<'src>,
     references: &mut HashSet<Number>,
+    visited: &mut HashSet<&'src str>,
   ) {
     for reference in expression.references() {
-      if let Reference::Variable(variable) = reference
-        && let Some(assignment) = self.assignments.get(variable.lexeme())
-      {
-        references.insert(assignment.number);
+      match reference {
+        Reference::Call { name, .. } => {
+          if visited.insert(name.lexeme())
+            && let Some(function) = self.functions.get(name.lexeme())
+          {
+            self.collect_references(
+              &function.body,
+              &function.parameters.as_slice().into(),
+              references,
+              visited,
+            );
+          }
+        }
+        Reference::Variable(variable) => {
+          if context.lookup(variable.lexeme()).is_none()
+            && let Some(assignment) = self.assignments.get(variable.lexeme())
+            && references.insert(assignment.number)
+            && !self.overrides.contains_key(&assignment.number)
+          {
+            self.collect_references(
+              &assignment.value,
+              &ExpressionContext::new(),
+              references,
+              visited,
+            );
+          }
+        }
       }
     }
   }
@@ -230,7 +262,12 @@ impl<'src: 'run, 'run> VariableResolver<'src, 'run> {
           .name
           .error(CircularVariableDependency {
             variable: name,
-            circle: self.stack.clone(),
+            circle: self
+              .stack
+              .iter()
+              .skip_while(|variable| **variable != name)
+              .copied()
+              .collect(),
           }),
       );
     }

@@ -36,7 +36,7 @@ fn duplicate_attributes_are_disallowed() {
     )
     .stderr(
       "
-        error: recipe attribute `no-exit-message` first used on line 1 is duplicated on line 2
+        error: attribute `no-exit-message` first used on line 1 is duplicated on line 2
          ——▶ justfile:2:2
           │
         2 │ [no-exit-message]
@@ -118,7 +118,7 @@ fn multiple_attributes_one_line_duplicate_check() {
     )
     .stderr(
       "
-        error: recipe attribute `linux` first used on line 1 is duplicated on line 2
+        error: attribute `linux` first used on line 1 is duplicated on line 2
          ——▶ justfile:2:2
           │
         2 │ [linux]
@@ -289,6 +289,27 @@ fn doc_attribute_may_be_expression() {
 }
 
 #[test]
+fn doc_attribute_may_reference_variable_transitively() {
+  Test::new()
+    .justfile(
+      "
+        a := b
+        b := 'bar'
+        [doc(a)]
+        foo:
+      ",
+    )
+    .args(["--list"])
+    .stdout(
+      "
+        Available recipes:
+            foo # bar
+      ",
+    )
+    .success();
+}
+
+#[test]
 fn doc_attribute_list_is_joined() {
   Test::new()
     .justfile(
@@ -421,7 +442,7 @@ fn duplicate_non_repeatable_attributes_are_forbidden() {
     )
     .stderr(
       "
-        error: recipe attribute `confirm` first used on line 1 is duplicated on line 2
+        error: attribute `confirm` first used on line 1 is duplicated on line 2
          ——▶ justfile:2:2
           │
         2 │ [confirm: 'no']
@@ -469,6 +490,21 @@ fn env_attribute_multiple() {
       ",
     )
     .stdout("value1 value 2\n")
+    .success();
+}
+
+#[test]
+fn env_attribute_is_visible_to_shell_function() {
+  Test::new()
+    .justfile(
+      "
+        [env('FOO', 'bar')]
+        foo:
+          @echo {{ `echo backtick-$FOO` }} {{ shell('echo shell-$FOO') }}
+      ",
+    )
+    .arg("foo")
+    .stdout("backtick-bar shell-bar\n")
     .success();
 }
 

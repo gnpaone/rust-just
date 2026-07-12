@@ -336,6 +336,18 @@ fn circular_module_imports_are_detected() {
 }
 
 #[test]
+fn circular_module_through_path_with_parent_is_detected() {
+  Test::new()
+    .write("sub/foo.just", "mod bar '../justfile'")
+    .justfile("mod foo 'sub/foo.just'")
+    .arg("--list")
+    .stderr_regex(path_for_regex(
+      "error: import `.*/justfile` in `.*/sub/foo.just` is circular\n",
+    ))
+    .failure();
+}
+
+#[test]
 fn modules_use_module_settings() {
   Test::new()
     .write(
@@ -635,6 +647,26 @@ fn modules_require_unambiguous_file() {
       "
       .replace('/', MAIN_SEPARATOR_STR),
     )
+    .failure();
+}
+
+#[test]
+fn modules_outside_justfile_directory_require_unambiguous_file() {
+  let test = Test::new()
+    .create_dir("root")
+    .write("external/justfile", "")
+    .write("external/.justfile", "");
+
+  let external = test.tempdir.path().join("external");
+
+  test
+    .write(
+      "root/justfile",
+      &format!("mod foo '{}'\n", external.display()),
+    )
+    .current_dir("root")
+    .arg("--summary")
+    .stderr_regex("error: found multiple source files for module `foo`:.*")
     .failure();
 }
 
@@ -2108,4 +2140,46 @@ fn submodule_function_bodies_are_not_shadowed_by_parent_variables() {
     .arg("sub::foo")
     .stdout("sub sub\n")
     .success();
+}
+
+#[test]
+fn ignore_files_named_after_module_directory() {
+  Test::new()
+    .write("foo.just", "bar:\n")
+    .write("foo", "baz\n")
+    .justfile("mod foo")
+    .arg("--list")
+    .stdout("Available recipes:\n    foo ...\n")
+    .success();
+}
+
+#[test]
+fn sugest_similarly_named_submodules() {
+  Test::new()
+    .write("foo.just", "bar:\n")
+    .justfile("mod foo")
+    .arg("fo::bar")
+    .stderr(
+      "
+        error: justfile does not contain submodule `fo`
+        Did you mean `foo`?
+      ",
+    )
+    .status(1);
+}
+
+#[test]
+fn argument_count_mismatch_usage_hint_includes_module_path() {
+  Test::new()
+    .write("foo.just", "bar baz:\n  @echo {{ baz }}\n")
+    .justfile("mod foo")
+    .arg("foo::bar")
+    .stderr(
+      "
+        error: recipe `bar` got 0 positional arguments but takes 1
+        usage:
+            just foo::bar baz
+      ",
+    )
+    .failure();
 }

@@ -190,6 +190,9 @@ pub(crate) enum Error<'src> {
   Interrupted {
     signal: Signal,
   },
+  InvalidOption {
+    argument: String,
+  },
   InvalidShebang {
     recipe: Name<'src>,
     shebang: String,
@@ -333,6 +336,7 @@ pub(crate) enum Error<'src> {
   },
   UnknownSubmodule {
     path: String,
+    suggestion: Option<Suggestion<'src>>,
   },
   UnstableFeature {
     unstable_feature: UnstableFeature,
@@ -350,14 +354,26 @@ impl<'src> Error<'src> {
         output_error: OutputError::Code(code),
         ..
       }
+      | Self::DotenvCommand {
+        output_error: OutputError::Code(code),
+        ..
+      }
       | Self::Code { code, .. } => Some(*code),
 
-      Self::ChooserStatus { status, .. } | Self::EditorStatus { status, .. } => status.code(),
+      Self::ChooserStatus { status, .. }
+      | Self::CommandStatus { status, .. }
+      | Self::EditorStatus { status, .. } => status
+        .code()
+        .or_else(|| Platform::signal_from_exit_status(*status).and_then(signal_exit_code)),
       Self::Backtick {
         output_error: OutputError::Signal(signal),
         ..
       }
-      | Self::Signal { signal, .. } => 128i32.checked_add(*signal),
+      | Self::DotenvCommand {
+        output_error: OutputError::Signal(signal),
+        ..
+      }
+      | Self::Signal { signal, .. } => signal_exit_code(*signal),
       Self::Backtick {
         output_error: OutputError::Interrupted(signal),
         ..
@@ -433,7 +449,8 @@ impl<'src> Error<'src> {
     match self {
       Self::EvalUnknownSubmodule { suggestion, .. }
       | Self::EvalUnknownSubmoduleOrVariable { suggestion, .. }
-      | Self::UnknownRecipe { suggestion, .. } => suggestion.as_ref(),
+      | Self::UnknownRecipe { suggestion, .. }
+      | Self::UnknownSubmodule { suggestion, .. } => suggestion.as_ref(),
       _ => None,
     }
   }
@@ -821,6 +838,9 @@ impl ColorDisplay for Error<'_> {
       Interrupted { signal } => {
         write!(f, "interrupted by {signal}")?;
       }
+      InvalidOption { argument } => {
+        write!(f, "argument `{argument}` is not a valid option")?;
+      }
       InvalidShebang { recipe, shebang } => {
         write!(f, "recipe `{recipe}` has invalid shebang `{shebang}`")?;
       }
@@ -1068,7 +1088,7 @@ impl ColorDisplay for Error<'_> {
       UnknownRecipe { recipe, .. } => {
         write!(f, "justfile does not contain recipe `{recipe}`")?;
       }
-      UnknownSubmodule { path } => {
+      UnknownSubmodule { path, .. } => {
         write!(f, "justfile does not contain submodule `{path}`")?;
       }
       UnstableFeature { unstable_feature } => {
@@ -1091,13 +1111,12 @@ impl ColorDisplay for Error<'_> {
 
     if let PositionalArgumentCountMismatch { recipe, .. } = self {
       writeln!(f)?;
-      let path = Modulepath::try_from([recipe.name()].as_slice()).unwrap();
       write!(
         f,
         "{}",
         Usage {
           long: false,
-          path: &path,
+          path: recipe.recipe_path(),
           recipe,
         }
         .color_display(color)
