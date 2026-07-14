@@ -8,7 +8,7 @@ const baseOptions: Options = {
   minify: false,
   external: Object.keys(dependencies),
   sourcemap: true,
-  target: "es2020",
+  target: "esnext",
   tsconfig: "tsconfig.json",
   keepNames: true,
   treeshake: true,
