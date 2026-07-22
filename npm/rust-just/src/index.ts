@@ -37,7 +37,7 @@ async function run() {
   const execaOptions: ExecaOptions = {
     stdio: "inherit",
     reject: false,
-    ...(argv.execaoptions || {}),
+    ...(argv.execaoptions ?? {}),
   };
 
   const processResult = await execa(fileURLToPath(exePath), args, execaOptions);
