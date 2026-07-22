@@ -50,7 +50,7 @@
     "@typescript-eslint/parser": "^8.21.0",
     "eslint": "^10.0.0",
     "tsup": "^8.3.5",
-    "typescript": "^6.0.2"
+    "typescript": "^7.0.2"
   },
   "optionalDependencies": {
     "rust-just-darwin-arm64": "1.57.0",
