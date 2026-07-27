@@ -65,6 +65,7 @@ pub(crate) enum Attribute<'src> {
   Private,
   Script(Option<Interpreter<StringLiteral<'src>>>),
   Shell,
+  Timestamp(Option<Expression<'src>>),
   Unix,
   Windows,
   WorkingDirectory(Expression<'src>),
@@ -74,7 +75,7 @@ impl AttributeKind {
   fn accepts_expressions(self) -> bool {
     matches!(
       self,
-      Self::Confirm | Self::Doc | Self::Env | Self::WorkingDirectory
+      Self::Confirm | Self::Doc | Self::Env | Self::Timestamp | Self::WorkingDirectory
     )
   }
 
@@ -118,7 +119,7 @@ impl AttributeKind {
       | Self::Shell
       | Self::Unix
       | Self::Windows => 0..=0,
-      Self::Confirm | Self::Doc => 0..=1,
+      Self::Confirm | Self::Doc | Self::Timestamp => 0..=1,
       Self::Continue | Self::Script => 0..=usize::MAX,
       Self::Arg | Self::Extension | Self::Group | Self::WorkingDirectory => 1..=1,
       Self::Env => 2..=2,
@@ -201,6 +202,9 @@ impl<'src> Attribute<'src> {
           let (_, value) = arguments.next().unwrap();
           Ok(Self::Env(key, value))
         }
+        AttributeKind::Timestamp => Ok(Self::Timestamp(
+          arguments.into_iter().next().map(|(_, expr)| expr),
+        )),
         AttributeKind::WorkingDirectory => Ok(Self::WorkingDirectory(
           arguments.into_iter().next().map(|(_, expr)| expr).unwrap(),
         )),
@@ -246,6 +250,7 @@ impl<'src> Attribute<'src> {
       AttributeKind::Confirm
       | AttributeKind::Doc
       | AttributeKind::Env
+      | AttributeKind::Timestamp
       | AttributeKind::WorkingDirectory => {
         unreachable!()
       }
@@ -593,6 +598,7 @@ impl Display for Attribute<'_> {
       | Self::Private
       | Self::Script(None)
       | Self::Shell
+      | Self::Timestamp(None)
       | Self::Unix
       | Self::Windows => {}
       Self::Cache {
@@ -616,6 +622,7 @@ impl Display for Attribute<'_> {
       }
       Self::Confirm(Some(argument))
       | Self::Doc(Some(argument))
+      | Self::Timestamp(Some(argument))
       | Self::WorkingDirectory(argument) => {
         write!(f, "({argument})")?;
       }
