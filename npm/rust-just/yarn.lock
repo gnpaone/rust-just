@@ -2520,9 +2520,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rust-just-linux-armv7@npm:1.57.0":
-  version: 1.57.0
-  resolution: "rust-just-linux-armv7@npm:1.57.0"
+"rust-just-linux-armv7@npm:1.58.0":
+  version: 1.58.0
+  resolution: "rust-just-linux-armv7@npm:1.58.0"
   conditions: os=linux & cpu=armv7
   languageName: node
   linkType: hard
@@ -2576,7 +2576,7 @@ __metadata:
     rust-just-darwin-x64: "npm:1.58.0"
     rust-just-linux-arm: "npm:1.57.0"
     rust-just-linux-arm64: "npm:1.58.0"
-    rust-just-linux-armv7: "npm:1.57.0"
+    rust-just-linux-armv7: "npm:1.58.0"
     rust-just-linux-loong64: "npm:1.58.0"
     rust-just-linux-riscv64: "npm:1.58.0"
     rust-just-linux-x64: "npm:1.58.0"
