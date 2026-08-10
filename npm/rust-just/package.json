@@ -53,7 +53,7 @@
     "typescript": "^7.0.2"
   },
   "optionalDependencies": {
-    "rust-just-darwin-arm64": "1.57.0",
+    "rust-just-darwin-arm64": "1.58.0",
     "rust-just-darwin-x64": "1.58.0",
     "rust-just-linux-arm": "1.58.0",
     "rust-just-linux-arm64": "1.58.0",
