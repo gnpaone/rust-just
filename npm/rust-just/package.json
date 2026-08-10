@@ -56,7 +56,7 @@
     "rust-just-darwin-arm64": "1.57.0",
     "rust-just-darwin-x64": "1.57.0",
     "rust-just-linux-arm": "1.57.0",
-    "rust-just-linux-arm64": "1.57.0",
+    "rust-just-linux-arm64": "1.58.0",
     "rust-just-linux-armv7": "1.57.0",
     "rust-just-linux-loong64": "1.57.0",
     "rust-just-linux-riscv64": "1.57.0",
