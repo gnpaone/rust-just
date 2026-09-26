@@ -1,15 +1,6 @@
 use super::*;
 
 #[test]
-fn search_directory_without_recipe() {
-  Test::new()
-    .justfile("foo:")
-    .args(["--usage", "."])
-    .stderr("error: `--usage` requires recipe\n")
-    .failure();
-}
-
-#[test]
 fn usage_recipe_in_search_directory() {
   Test::new()
     .justfile("foo bar:")
@@ -67,6 +58,76 @@ foo a b c='abc' d e f='xyz' g='bar' *h:
 }
 
 #[test]
+fn no_sections() {
+  Test::new()
+    .justfile("foo:")
+    .args(["--usage", "foo"])
+    .stdout("Usage: just foo\n")
+    .success();
+}
+
+#[test]
+fn arguments_only() {
+  Test::new()
+    .justfile("foo bar:")
+    .args(["--usage", "foo"])
+    .stdout(
+      "
+        Usage: just foo bar
+
+        Arguments:
+          bar
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn options_only() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', short='b')]
+        foo bar:
+      ",
+    )
+    .args(["--usage", "foo"])
+    .stdout(
+      "
+        Usage: just foo [OPTIONS]
+
+        Options:
+          -b bar
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn arguments_and_options() {
+  Test::new()
+    .justfile(
+      "
+        [arg('bar', short='b')]
+        foo bar baz:
+      ",
+    )
+    .args(["--usage", "foo"])
+    .stdout(
+      "
+        Usage: just foo [OPTIONS] baz
+
+        Arguments:
+          baz
+
+        Options:
+          -b bar
+      ",
+    )
+    .success();
+}
+
+#[test]
 fn flags_have_no_value_placeholder() {
   Test::new()
     .justfile(
@@ -82,9 +143,113 @@ fn flags_have_no_value_placeholder() {
     .stdout(
       "
         Usage: just foo [OPTIONS]
+
         Options:
               --bar a flag
       ",
     )
+    .success();
+}
+
+#[test]
+fn root_module() {
+  Test::new()
+    .justfile(
+      "
+        # comment
+        foo bar:
+
+        [arg('baz', short='b')]
+        qux baz:
+      ",
+    )
+    .args(["--usage"])
+    .stdout(
+      "
+        Usage:
+            # comment
+            just foo bar
+              bar
+
+            just qux [OPTIONS]
+              -b baz
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn submodule() {
+  Test::new()
+    .justfile("mod foo")
+    .write("foo.just", "bar:")
+    .args(["--usage", "foo"])
+    .stdout(
+      "
+        Usage:
+            just foo bar
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn module_alias() {
+  Test::new()
+    .justfile(
+      "
+        mod foo
+
+        alias f := foo
+      ",
+    )
+    .write("foo.just", "bar:")
+    .args(["--usage", "f"])
+    .stdout(
+      "
+        Usage:
+            just f bar
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn multi_line_doc() {
+  Test::new()
+    .justfile(
+      "
+        [doc(\"foo\\nbar\")]
+        baz:
+      ",
+    )
+    .args(["--usage"])
+    .stdout(
+      "
+        Usage:
+            # foo
+            # bar
+            just baz
+      ",
+    )
+    .success();
+}
+
+#[test]
+fn empty_module() {
+  Test::new()
+    .justfile("mod foo")
+    .write("foo.just", "")
+    .args(["--usage", "foo"])
+    .stderr("module contains no recipes\n")
+    .success();
+}
+
+#[test]
+fn empty_module_quiet() {
+  Test::new()
+    .justfile("mod foo")
+    .write("foo.just", "")
+    .args(["--quiet", "--usage", "foo"])
     .success();
 }

@@ -423,7 +423,7 @@ fn usage_recipes() {
     .shell(false)
     .env("JUST_COMPLETE", "fish")
     .args(complete_args(&["--usage", ""]))
-    .stdout("bar\nfoo\n")
+    .stdout_regex("bar\nfoo\nbar\nfoo\n.\njustfile\n--.*")
     .success();
 }
 
@@ -451,5 +451,104 @@ fn recipes_with_invalid_config() {
     .env("JUST_ALIAS_STYLE", "foo")
     .args(complete_args(&[""]))
     .stdout_regex("bar\nfoo\n.\njustfile\n--.*")
+    .success();
+}
+
+#[test]
+fn list_modules() {
+  Test::new()
+    .justfile(
+      "
+        # doc
+        mod foo
+      ",
+    )
+    .write("foo.just", "mod bar")
+    .write("bar.just", "baz:")
+    .shell(false)
+    .env("JUST_COMPLETE", "fish")
+    .args(complete_args(&["--list", ""]))
+    .stdout_regex("foo\tdoc\nfoo::bar\nfoo::bar::baz\n.\nbar.just\nfoo.just\njustfile\n--.*")
+    .success();
+}
+
+#[test]
+fn list_module_aliases_not_completed_by_default() {
+  Test::new()
+    .justfile(
+      "
+        mod foo
+        alias f := foo
+      ",
+    )
+    .write("foo.just", "")
+    .shell(false)
+    .env("JUST_COMPLETE", "fish")
+    .args(complete_args(&["--list", ""]))
+    .stdout_regex("foo\n.\nfoo.just\njustfile\n--.*")
+    .success();
+}
+
+#[test]
+fn list_module_aliases_completed_with_flag() {
+  Test::new()
+    .justfile(
+      "
+        # doc
+        mod foo
+        alias f := foo
+      ",
+    )
+    .write("foo.just", "")
+    .shell(false)
+    .env("JUST_COMPLETE", "fish")
+    .args(complete_args(&["--complete-aliases", "--list", ""]))
+    .stdout_regex("foo\tdoc\nf\tdoc\n.\nfoo.just\njustfile\n--.*")
+    .success();
+}
+
+#[test]
+fn clean_recipes_and_modules() {
+  Test::new()
+    .justfile(
+      "
+        mod foo
+        bar:
+      ",
+    )
+    .write(
+      "foo.just",
+      "
+        mod baz
+        qux:
+      ",
+    )
+    .write("baz.just", "quux:")
+    .shell(false)
+    .env("JUST_COMPLETE", "fish")
+    .args(complete_args(&["--clean", ""]))
+    .stdout_regex(
+      "bar\nfoo\nfoo::qux\nfoo::baz\nfoo::baz::quux\n\
+       bar\nfoo::qux\nfoo::baz::quux\n.\nbaz.just\nfoo.just\njustfile\n--.*",
+    )
+    .success();
+}
+
+#[test]
+fn clean_aliases() {
+  Test::new()
+    .justfile(
+      "
+        mod foo
+        bar:
+        alias b := bar
+        alias f := foo
+      ",
+    )
+    .write("foo.just", "")
+    .shell(false)
+    .env("JUST_COMPLETE", "fish")
+    .args(complete_args(&["--complete-aliases", "--clean", ""]))
+    .stdout_regex("bar\nb\nf\nfoo\nbar\nb\n.\nfoo.just\njustfile\n--.*")
     .success();
 }

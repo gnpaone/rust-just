@@ -367,6 +367,7 @@ pub(crate) struct Subcommand {
   )]
   pub(crate) choose: bool,
   #[arg(
+    add = ArgValueCompleter::new(Completer::complete_recipe_or_module),
     conflicts_with = "arguments",
     help = "Clear recipe cache, optionally restricted to recipes whose path begins with <RECIPE_PATH>",
     help_heading = Self::HEADING,
@@ -443,6 +444,7 @@ pub(crate) struct Subcommand {
   )]
   pub(crate) json: bool,
   #[arg(
+    add = ArgValueCompleter::new(Completer::complete_module),
     conflicts_with = "arguments",
     help = "List available recipes in <MODULE> or root if omitted",
     help_heading = Self::HEADING,
@@ -484,13 +486,14 @@ pub(crate) struct Subcommand {
   )]
   pub(crate) summary: bool,
   #[arg(
-    add = ArgValueCompleter::new(Completer::complete_recipe),
+    add = ArgValueCompleter::new(Completer::complete_recipe_or_module),
     conflicts_with = "arguments",
-    help = "Print usage information for recipe at <RECIPE_PATH>",
+    help = "Print usage information for recipe at <PATH> or all recipes in module at <PATH>, \
+            defaulting to all recipes in the root justfile",
     help_heading = Self::HEADING,
     long,
-    num_args = 1..,
-    value_name = "RECIPE_PATH",
+    num_args = 0..,
+    value_name = "PATH",
   )]
   pub(crate) usage: Option<Vec<String>>,
   #[arg(
