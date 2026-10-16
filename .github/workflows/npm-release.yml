@@ -9,6 +9,9 @@ permissions:
   contents: read
   id-token: write
 
+env:
+  TEST_VERSION: "1.58.0"
+
 jobs:
   find-latest-tag:
     name: Find Latest Tag
@@ -116,6 +119,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: 1.58.0
+          fetch-depth: 0
       - name: Install Node.js
         uses: actions/setup-node@v7
         with:
@@ -133,13 +139,13 @@ jobs:
           yarn config get npmPreapprovedPackages
           npm view rust-just-darwin-arm64@${LATEST_VERSION} time
         env:
-          LATEST_VERSION: ${{ needs.find-latest-tag.outputs.tag }}
+          LATEST_VERSION: ${{ env.TEST_VERSION }}
         working-directory: npm/rust-just
       - name: Update version & lockfile
         shell: bash
         working-directory: npm/rust-just
         run: |
-          LATEST_VERSION=${{ needs.find-latest-tag.outputs.tag }}
+          LATEST_VERSION=${{ env.TEST_VERSION }}
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$LATEST_VERSION\"/; s/\"\(rust-just-[^\"]*\)\": \"[^\"]*\"/\"\1\": \"$LATEST_VERSION\"/g" package.json
           yarn install
         env:
