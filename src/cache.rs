@@ -12,14 +12,9 @@ impl Cache {
     &self,
     config: &Config,
     key: CacheKey,
-    outputs: &BTreeMap<String, Utf8PathBuf>,
+    outputs: BTreeMap<String, Utf8PathBuf>,
   ) -> RunResult<'static, CacheStatus> {
-    let mut hasher = blake3::Hasher::new();
-
-    serde_json::to_writer(&mut hasher, &key)
-      .map_err(|source| Error::CacheKeySerialize { source })?;
-
-    let hash = hasher.finalize();
+    let hash = Hash::json(&key).map_err(|source| Error::CacheKeySerialize { source })?;
 
     let path = self.entry(hash)?;
 
@@ -49,25 +44,41 @@ impl Cache {
 
     file.lock().map_err(context)?;
 
-    if file.metadata().map_err(context)?.len() == 0 {
+    let Some(entry) = CacheEntry::load(&file, &path)? else {
       return Ok(CacheStatus::Miss(CacheLock {
         file,
+        outputs,
         path,
         recipe: key.recipe.clone(),
       }));
-    }
+    };
 
-    for output in outputs.values() {
-      if !filesystem::exists(output)? {
-        return Ok(CacheStatus::Miss(CacheLock {
-          file,
-          path,
-          recipe: key.recipe.clone(),
-        }));
+    let expected = entry
+      .outputs
+      .into_iter()
+      .map(|(name, output)| (name, Some(output)))
+      .collect();
+
+    if Self::outputs(&outputs)? == expected {
+      if config.verbosity.loquacious() {
+        eprintln!(
+          "{}",
+          config
+            .color
+            .stderr()
+            .banner()
+            .paint("===> cache hit, skipping invocation"),
+        );
       }
+      Ok(CacheStatus::Hit)
+    } else {
+      Ok(CacheStatus::Miss(CacheLock {
+        file,
+        outputs,
+        path,
+        recipe: key.recipe.clone(),
+      }))
     }
-
-    Ok(CacheStatus::Hit)
   }
 
   pub(crate) fn new(search: &Search) -> Self {
@@ -77,14 +88,11 @@ impl Cache {
     }
   }
 
-  fn entry(&self, key: blake3::Hash) -> RunResult<'static, Utf8PathBuf> {
+  fn entry(&self, key: Hash) -> RunResult<'static, Utf8PathBuf> {
     let mut initialized = self.initialized.lock().unwrap();
 
     if !*initialized {
-      fs::create_dir_all(&self.path).map_err(|source| Error::FilesystemIo {
-        source,
-        path: self.path.clone(),
-      })?;
+      filesystem::create_dir_all(&self.path)?;
       *initialized = true;
     }
 
@@ -94,37 +102,47 @@ impl Cache {
   pub(crate) fn inputs(
     value: Value,
     working_directory: &Utf8Path,
-  ) -> RunResult<'static, BTreeMap<String, blake3::Hash>> {
+  ) -> RunResult<'static, BTreeMap<String, Hash>> {
     let mut inputs = BTreeMap::new();
 
     for input in value {
       let path = working_directory.join(&input);
 
-      let metadata = match fs::metadata(&path) {
-        Ok(metadata) => metadata,
-        Err(source) if source.kind() == io::ErrorKind::NotFound => {
-          return Err(Error::CacheInputMissing { path });
-        }
-        Err(source) => return Err(Error::FilesystemIo { source, path }),
+      let Some(metadata) = filesystem::metadata_opt(&path)? else {
+        return Err(Error::CacheInputMissing { path });
       };
 
       if metadata.is_dir() {
         return Err(Error::CacheInputDirectory { path });
       }
 
-      let mut hasher = blake3::Hasher::new();
-
-      hasher
-        .update_mmap_rayon(&path)
-        .map_err(|source| Error::FilesystemIo {
-          source,
-          path: path.clone(),
-        })?;
-
-      inputs.insert(input, hasher.finalize());
+      inputs.insert(input, Hash::file(&path)?);
     }
 
     Ok(inputs)
+  }
+
+  pub(crate) fn outputs(
+    paths: &BTreeMap<String, Utf8PathBuf>,
+  ) -> RunResult<'static, BTreeMap<String, Option<CacheOutput>>> {
+    let mut outputs = BTreeMap::new();
+
+    for (name, path) in paths {
+      let output = match filesystem::metadata_opt(path)? {
+        Some(metadata) => {
+          if metadata.is_dir() {
+            Some(CacheOutput::Directory)
+          } else {
+            Some(CacheOutput::File(Hash::file(path)?))
+          }
+        }
+        None => None,
+      };
+
+      outputs.insert(name.clone(), output);
+    }
+
+    Ok(outputs)
   }
 
   pub(crate) fn dir(search: &Search) -> Utf8PathBuf {

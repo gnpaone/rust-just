@@ -22,6 +22,7 @@ pub(crate) use {
     cache_entry::CacheEntry,
     cache_key::CacheKey,
     cache_lock::CacheLock,
+    cache_output::CacheOutput,
     cache_status::CacheStatus,
     clean::Clean,
     color::Color,
@@ -46,6 +47,7 @@ pub(crate) use {
     dependency::Dependency,
     dependency_argument::DependencyArgument,
     disabled::Disabled,
+    dry_run::DryRun,
     dump_format::DumpFormat,
     element::Element,
     enclosure::Enclosure,
@@ -61,6 +63,7 @@ pub(crate) use {
     fragment::Fragment,
     function::Function,
     function_definition::FunctionDefinition,
+    hash::Hash,
     indentation::Indentation,
     interpreter::Interpreter,
     invocation::Invocation,
@@ -181,7 +184,7 @@ pub(crate) use {
     time::Instant,
     vec,
   },
-  strum::{Display, EnumDiscriminants, EnumIter, EnumString, IntoStaticStr},
+  strum::{Display, EnumDiscriminants, EnumIter, EnumString, IntoEnumIterator, IntoStaticStr},
   tempfile::TempDir,
   typed_arena::Arena,
   unicode_width::{UnicodeWidthChar, UnicodeWidthStr},
@@ -257,6 +260,7 @@ mod cache;
 mod cache_entry;
 mod cache_key;
 mod cache_lock;
+mod cache_output;
 mod cache_status;
 mod clean;
 mod color;
@@ -282,6 +286,7 @@ mod dependency;
 mod dependency_argument;
 mod dir;
 mod disabled;
+mod dry_run;
 mod dump_format;
 mod element;
 mod enclosure;
@@ -298,6 +303,7 @@ mod format_string_part;
 mod fragment;
 mod function;
 mod function_definition;
+mod hash;
 mod indentation;
 mod interpreter;
 mod invocation;
