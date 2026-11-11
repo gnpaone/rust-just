@@ -60,7 +60,7 @@ impl<'src> UnresolvedRecipe<'src> {
     let attributes = self
       .attributes
       .into_items()
-      .map(|(mut attribute, name)| {
+      .map(|(mut attribute, (name, trailing_comment))| {
         match &mut attribute {
           Attribute::Arg {
             help_property,
@@ -177,7 +177,7 @@ impl<'src> UnresolvedRecipe<'src> {
             *pattern = Some(compiled);
           }
         }
-        Ok((attribute, name))
+        Ok((attribute, (name, trailing_comment)))
       })
       .collect::<CompileResult<AttributeSet>>()?;
 
@@ -249,6 +249,7 @@ impl<'src> UnresolvedRecipe<'src> {
       quiet: self.quiet,
       recipe_path: Some(recipe_path),
       shebang: self.shebang,
+      trailing_comment: self.trailing_comment,
       variable_references,
     })
   }

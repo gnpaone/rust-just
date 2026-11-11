@@ -1848,14 +1848,14 @@ fn trailing_comment_does_not_become_doc_comment() {
 }
 
 #[test]
-fn trailing_comment_recipe_with_body_is_stripped() {
+fn trailing_comment_recipe_with_body() {
   assert_dump(
     "
         foo: # bar
           echo baz
       ",
     "
-        foo:
+        foo: # bar
             echo baz
       ",
   );
@@ -1874,7 +1874,7 @@ fn trailing_comment_export() {
 }
 
 #[test]
-fn trailing_comment_recipe_with_dependencies_and_body_is_stripped() {
+fn trailing_comment_recipe_with_dependencies_and_body() {
   assert_dump(
     "
         foo: bar # baz
@@ -1883,9 +1883,23 @@ fn trailing_comment_recipe_with_dependencies_and_body_is_stripped() {
         bar:
       ",
     "
-        foo: bar
+        foo: bar # baz
             echo qux
 
+        bar:
+      ",
+  );
+}
+
+#[test]
+fn trailing_comment_attribute() {
+  assert_dump(
+    "
+        [no-cd] # foo
+        bar:
+      ",
+    "
+        [no-cd] # foo
         bar:
       ",
   );
